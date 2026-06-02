@@ -6,7 +6,7 @@ from passlib.context import CryptContext
 from sqlmodel import Session, select
 
 from app.database import get_session
-from app.models import Uzytkownik
+from app.models import Uzytkownik, Transakcja
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -176,7 +176,7 @@ async def proces_krok3(
     )
 
 
-# --- NOWY ENDPOINT KROK 4 (Ostateczna walidacja przed strzałem) ---
+# --- ENDPOINT KROK 4 (Ostateczna walidacja przed strzałem) ---
 
 @router.post("/hud/krok4", response_class=HTMLResponse)
 async def proces_krok4(
@@ -208,4 +208,66 @@ async def proces_krok4(
             "ranga_strzalu": ranga_strzalu,
             "komentarz": komentarz
         }
+    )
+
+
+# --- FINALNY ENDPOINT: REJESTRACJA TRANSAKCJI (STRZAŁ) ---
+
+@router.post("/hud/strzal", response_class=HTMLResponse)
+async def proces_strzalu(
+    aktywo: str = Form(...),
+    interwal: str = Form(...),
+    kierunek: str = Form(...),
+    cena_wejscia: float = Form(...),
+    kwota_pozycji: float = Form(...),
+    aktualne_rsi: float = Form(...),
+    stop_loss: float = Form(...),
+    poziom_halasu: str = Form(...),
+    ranga_strzalu: str = Form(...),
+    komentarz: Optional[str] = Form(None),
+    session: Session = Depends(get_session)
+) -> HTMLResponse:
+    """Finalizuje transakcję: sprawdza fundusze, aktualizuje kapitał i zapisuje pozycję."""
+    # 1. Pobranie użytkownika
+    uzytkownik = session.exec(select(Uzytkownik)).first()
+    if not uzytkownik:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Nie znaleziono żadnego użytkownika w bazie danych."
+        )
+
+    # 2. Walidacja funduszy portfela
+    if uzytkownik.kapital < kwota_pozycji:
+        return HTMLResponse(
+            content="Błąd: Brak wystarczających funduszy (kapitału) na otwarcie tej pozycji!",
+            headers={"HX-Retarget": "#error-message"}
+        )
+
+    # 3. Aktualizacja kapitału użytkownika (zamrożenie środków pod pozycję)
+    uzytkownik.kapital -= kwota_pozycji
+    session.add(uzytkownik)
+
+    # 4. Tworzenie i konfiguracja nowego obiektu Transakcja
+    nowa_transakcja = Transakcja(
+        aktywo=aktywo,
+        interwal=interwal,
+        kierunek=kierunek,
+        cena_wejscia=cena_wejscia,
+        kwota_pozycji=kwota_pozycji,
+        stop_loss=stop_loss,
+        aktualne_rsi=aktualne_rsi,
+        poziom_halasu=poziom_halasu,
+        ranga_strzalu=ranga_strzalu,
+        komentarz=komentarz,
+        status_pozycji="OTWARTA"
+    )
+
+    # 5. Zapisanie danych w bazie (ACID atomowość)
+    session.add(nowa_transakcja)
+    session.commit()
+
+    # 6. Wymuszenie pełnego odświeżenia HUD-a przez HTMX ze zaktualizowanym kapitałem
+    return HTMLResponse(
+        content="",
+        headers={"HX-Redirect": "/auth/hud"}
     )

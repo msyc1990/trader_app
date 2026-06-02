@@ -4,7 +4,7 @@
         <span class="text-[10px] font-mono text-stone-400 uppercase font-bold">{{ aktywo }} / {{ interwal }} / {{ kierunek }}</span>
     </div>
 
-    <form hx-post="/hud/krok3" hx-target="#kontener-kroku" hx-swap="outerHTML" class="space-y-4">
+    <form hx-post="/auth/hud/krok3" hx-target="#kontener-kroku" hx-swap="outerHTML" class="space-y-4">
         <input type="hidden" name="aktywo" value="{{ aktywo }}">
         <input type="hidden" name="interwal" value="{{ interwal }}">
         <input type="hidden" name="kierunek" value="{{ kierunek }}">

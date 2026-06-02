@@ -40,7 +40,7 @@
         {% endif %}
     </div>
 
-    <form hx-post="/hud/strzal" hx-target="#app-container" hx-swap="innerHTML" class="space-y-2">
+    <form hx-post="/auth/hud/strzal" hx-target="#app-container" hx-swap="innerHTML" class="space-y-2">
         <input type="hidden" name="aktywo" value="{{ aktywo }}">
         <input type="hidden" name="interwal" value="{{ interwal }}">
         <input type="hidden" name="kierunek" value="{{ kierunek }}">

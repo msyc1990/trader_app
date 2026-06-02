@@ -10,7 +10,7 @@
         <p class="text-[10px] text-stone-500 mt-1">Poziom zabezpieczenia wyliczony na podstawie rygoru 2%</p>
     </div>
 
-    <form hx-post="/hud/krok4" hx-target="#kontener-kroku" hx-swap="outerHTML" class="space-y-4">
+    <form hx-post="/auth/hud/krok4" hx-target="#kontener-kroku" hx-swap="outerHTML" class="space-y-4">
         <input type="hidden" name="aktywo" value="{{ aktywo }}">
         <input type="hidden" name="interwal" value="{{ interwal }}">
         <input type="hidden" name="kierunek" value="{{ kierunek }}">
