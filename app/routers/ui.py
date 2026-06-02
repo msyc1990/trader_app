@@ -1,22 +1,19 @@
-from typing import Generator
+from typing import Generator, Optional
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from passlib.context import CryptContext
 from sqlmodel import Session, select
 
-# Założenie: Twoja konfiguracja bazy danych i modele znajdują się w tych ścieżkach
 from app.database import get_session
 from app.models import Uzytkownik
 
-# Inicjalizacja routera z odpowiednim prefiksem i tagami
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-# Konfiguracja bezpiecznego haszowania haseł za pomocą bcrypt
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# Konfiguracja szablonów Jinja2 (zakładamy katalog 'templates' w głównym folderze)
-templates = Jinja2Templates(directory="app/templates")
+# PROFESJONALNA POPRAWKA: Ścieżka uwzględniająca folder app/
+templates = Jinja2Templates(directory="app/app/templates" if False else "app/templates")
 
 
 # --- ENDPOINTY GET (Wyświetlanie formularzy) ---
@@ -50,19 +47,15 @@ async def proces_rejestracji(
     session: Session = Depends(get_session)
 ) -> HTMLResponse:
     """Przetwarza formularz rejestracji, tworząc nowego użytkownika w bazie."""
-    # 1. Sprawdzenie, czy użytkownik o podanym username już istnieje
     statement = select(Uzytkownik).where(Uzytkownik.username == username)
     istniejacy_uzytkownik = session.exec(statement).first()
 
     if istniejacy_uzytkownik:
-        # Jeśli użytkownik istnieje, zwracamy ten sam szablon z komunikatem błędu
-        return templates.TemplateResponse(
-            request=request,
-            name="rejestracja.html",
-            context={"error": "Użytkownik o takiej nazwie już istnieje!"}
+        return HTMLResponse(
+            content="Użytkownik o takiej nazwie już istnieje!",
+            headers={"HX-Retarget": "#error-message"}
         )
 
-    # 2. Haszowanie hasła i tworzenie nowego obiektu
     hashed_password = pwd_context.hash(password)
     nowy_uzytkownik = Uzytkownik(
         username=username,
@@ -70,12 +63,10 @@ async def proces_rejestracji(
         kapital=kapital
     )
 
-    # 3. Zapis do bazy danych
     session.add(nowy_uzytkownik)
     session.commit()
     session.refresh(nowy_uzytkownik)
 
-    # 4. Przekierowanie do logowania lub ekranu głównego (HUD) po sukcesie
     return templates.TemplateResponse(
         request=request,
         name="logowanie.html",
@@ -91,27 +82,22 @@ async def proces_logowania(
     session: Session = Depends(get_session)
 ) -> HTMLResponse:
     """Weryfikuje dane logowania użytkownika."""
-    # 1. Wyszukanie użytkownika w bazie
     statement = select(Uzytkownik).where(Uzytkownik.username == username)
     uzytkownik = session.exec(statement).first()
 
-    # 2. Weryfikacja istnienia użytkownika oraz poprawności zahaszowanego hasła
     if not uzytkownik or not pwd_context.verify(password, uzytkownik.password_hash):
-        return templates.TemplateResponse(
-            request=request,
-            name="logowanie.html",
-            context={"error": "Nieprawidłowa nazwa użytkownika lub hasło!"}
+        return HTMLResponse(
+            content="Nieprawidłowa nazwa użytkownika lub hasło!",
+            headers={"HX-Retarget": "#error-message"}
         )
 
-    # 3. Autoryzacja udana - przekierowanie do HUD (ekranu głównego aplikacji)
-    # Status 303 See Other jest zalecany przy przekierowaniach z metod POST
-    return RedirectResponse(
-        url="/auth/hud", 
-        status_code=status.HTTP_303_SEE_OTHER
+    return HTMLResponse(
+        content="",
+        headers={"HX-Redirect": "/auth/hud"}
     )
 
 
-# --- NOWY ENDPOINT HUD ---
+# --- ENDPOINT HUD ---
 
 @router.get("/hud", response_class=HTMLResponse)
 async def wyswietl_hud(
@@ -121,7 +107,6 @@ async def wyswietl_hud(
     """Pobiera pierwszego użytkownika z bazy danych i wyświetla panel główny HUD."""
     uzytkownik = session.exec(select(Uzytkownik)).first()
     
-    # Dodanie zabezpieczenia na wypadek braku użytkowników w bazie
     if not uzytkownik:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, 
@@ -132,4 +117,95 @@ async def wyswietl_hud(
         request=request,
         name="hud.html",
         context={"uzytkownik": uzytkownik}
+    )
+
+
+# --- ENDPOINT KROK 2 (Wstrzykiwany dynamicznie przez HTMX) ---
+
+@router.post("/hud/krok2", response_class=HTMLResponse)
+async def proces_krok2(
+    request: Request,
+    aktywo: str = Form(...),
+    interwal: str = Form(...),
+    kierunek: str = Form(...)
+) -> HTMLResponse:
+    """Odbiera wstępne parametry transakcji z formularza HUD i renderuje krok 2."""
+    return templates.TemplateResponse(
+        request=request,
+        name="krok2.html",
+        context={
+            "aktywo": aktywo,
+            "interwal": interwal,
+            "kierunek": kierunek
+        }
+    )
+
+
+# --- ENDPOINT KROK 3 (Obliczenia obronne i podsumowanie) ---
+
+@router.post("/hud/krok3", response_class=HTMLResponse)
+async def proces_krok3(
+    request: Request,
+    aktywo: str = Form(...),
+    interwal: str = Form(...),
+    kierunek: str = Form(...),
+    cena_wejscia: float = Form(...),
+    kwota_pozycji: float = Form(...),
+    aktualne_rsi: float = Form(...)
+) -> HTMLResponse:
+    """Odbiera dane szczegółowe, wylicza automatyczny Stop Loss i renderuje krok 3."""
+    if kierunek.upper() == "LONG":
+        stop_loss = cena_wejscia * 0.98
+    elif kierunek.upper() == "SHORT":
+        stop_loss = cena_wejscia * 1.02
+    else:
+        stop_loss = cena_wejscia
+
+    return templates.TemplateResponse(
+        request=request,
+        name="krok3.html",
+        context={
+            "aktywo": aktywo,
+            "interwal": interwal,
+            "kierunek": kierunek,
+            "cena_wejscia": cena_wejscia,
+            "kwota_pozycji": kwota_pozycji,
+            "aktualne_rsi": aktualne_rsi,
+            "stop_loss": round(stop_loss, 4)
+        }
+    )
+
+
+# --- NOWY ENDPOINT KROK 4 (Ostateczna walidacja przed strzałem) ---
+
+@router.post("/hud/krok4", response_class=HTMLResponse)
+async def proces_krok4(
+    request: Request,
+    aktywo: str = Form(...),
+    interwal: str = Form(...),
+    kierunek: str = Form(...),
+    cena_wejscia: float = Form(...),
+    kwota_pozycji: float = Form(...),
+    aktualne_rsi: float = Form(...),
+    stop_loss: float = Form(...),
+    poziom_halasu: str = Form(...),
+    ranga_strzalu: str = Form(...),
+    komentarz: Optional[str] = Form(None)
+) -> HTMLResponse:
+    """Zbiera absolutnie wszystkie parametry z poprzednich kroków i wyświetla krok 4."""
+    return templates.TemplateResponse(
+        request=request,
+        name="krok4.html",
+        context={
+            "aktywo": aktywo,
+            "interwal": interwal,
+            "kierunek": kierunek,
+            "cena_wejscia": cena_wejscia,
+            "kwota_pozycji": kwota_pozycji,
+            "aktualne_rsi": aktualne_rsi,
+            "stop_loss": stop_loss,
+            "poziom_halasu": poziom_halasu,
+            "ranga_strzalu": ranga_strzalu,
+            "komentarz": komentarz
+        }
     )

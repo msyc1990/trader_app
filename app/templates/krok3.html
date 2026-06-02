@@ -1,0 +1,56 @@
+<div id="kontener-kroku" class="space-y-4 animate-fade-in">
+    <div class="flex justify-between items-center bg-stone-950 p-2 rounded-lg border border-stone-800 font-mono text-xs">
+        <span class="text-purple-400">ETAP 3 z 4</span>
+        <span class="text-stone-400 font-bold">{{ aktywo }} / {{ interwal }} / {{ kierunek }}</span>
+    </div>
+
+    <div class="bg-purple-950/20 border border-purple-900/50 p-3 rounded-xl text-center font-mono">
+        <span class="text-[10px] text-purple-400 block uppercase tracking-wider">Automatyczny System Obrony (SL)</span>
+        <span class="text-xl font-bold text-rose-400 tracking-wide">{{ stop_loss }}</span>
+        <p class="text-[10px] text-stone-500 mt-1">Poziom zabezpieczenia wyliczony na podstawie rygoru 2%</p>
+    </div>
+
+    <form hx-post="/hud/krok4" hx-target="#kontener-kroku" hx-swap="outerHTML" class="space-y-4">
+        <input type="hidden" name="aktywo" value="{{ aktywo }}">
+        <input type="hidden" name="interwal" value="{{ interwal }}">
+        <input type="hidden" name="kierunek" value="{{ kierunek }}">
+        <input type="hidden" name="cena_wejscia" value="{{ cena_wejscia }}">
+        <input type="hidden" name="kwota_pozycji" value="{{ kwota_pozycji }}">
+        <input type="hidden" name="aktualne_rsi" value="{{ aktualne_rsi }}">
+        <input type="hidden" name="stop_loss" value="{{ stop_loss }}">
+
+        <div>
+            <label class="block text-xs font-mono uppercase text-stone-400 mb-1">Poziom Hałasu Rynku</label>
+            <select name="poziom_halasu" class="w-full bg-stone-950 border border-stone-800 rounded-lg px-3 py-2 text-stone-100 font-mono focus:outline-none focus:border-purple-500">
+                <option value="NISKI">🟢 NISKI (Stabilny trend)</option>
+                <option value="SREDNI">🟡 ŚREDNI (Konsolidacja/Zwykła zmienność)</option>
+                <option value="WYSOKI">🔴 WYSOKI (Dane makro / FOMC / Chaos)</option>
+            </select>
+        </div>
+
+        <div>
+            <label class="block text-xs font-mono uppercase text-stone-400 mb-1">Ranga Strzału (Potwierdzenia)</label>
+            <select name="ranga_strzalu" class="w-full bg-stone-950 border border-stone-800 rounded-lg px-3 py-2 text-stone-100 font-mono focus:outline-none focus:border-purple-500">
+                <option value="LASEROWY">⚡ STRZAŁ LASEROWY (Pełen zestaw potwierdzeń)</option>
+                <option value="RYKOSZET">🏹 RYKOSZET (Ryzykowne wejście / Agresywne)</option>
+            </select>
+        </div>
+
+        <div>
+            <label class="block text-xs font-mono uppercase text-stone-400 mb-1">Komentarz Taktyczny (Opcjonalnie)</label>
+            <input type="text" name="komentarz" placeholder="np. Dywergencja na RSI, test wsparcia" autocomplete="off"
+                   class="w-full bg-stone-950 border border-stone-800 rounded-lg px-3 py-2 text-stone-100 font-mono focus:outline-none focus:border-purple-500 text-sm">
+        </div>
+
+        <div class="flex gap-2">
+            <button type="button" hx-get="/auth/hud" hx-target="#app-container" hx-swap="innerHTML"
+                    class="w-1/3 bg-stone-950 hover:bg-stone-900 text-stone-500 hover:text-stone-300 font-mono text-xs uppercase py-2.5 rounded-lg border border-stone-800 transition-all cursor-pointer">
+                Reset
+            </button>
+            <button type="submit" 
+                    class="w-2/3 bg-purple-600 hover:bg-purple-500 text-white font-mono text-xs uppercase tracking-wider py-2.5 rounded-lg shadow-lg shadow-purple-950/30 transition-all cursor-pointer">
+                Generuj Raport Rygoru ->
+            </button>
+        </div>
+    </form>
+</div>

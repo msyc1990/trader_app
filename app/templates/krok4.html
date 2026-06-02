@@ -1,0 +1,65 @@
+<div id="kontener-kroku" class="space-y-4 animate-fade-in">
+    <div class="flex justify-between items-center bg-stone-950 p-2 rounded-lg border border-stone-800 font-mono text-xs">
+        <span class="text-rose-500 font-bold">⚠️ OSTATECZNA WERYFIKACJA (4 z 4)</span>
+    </div>
+
+    <div class="bg-stone-950/80 border border-stone-800 p-4 rounded-xl space-y-2 font-mono text-xs">
+        <div class="flex justify-between border-b border-stone-900 pb-1">
+            <span class="text-stone-500">AKTYWO:</span>
+            <span class="text-stone-200 font-bold">{{ aktywo }} ({{ interwal }})</span>
+        </div>
+        <div class="flex justify-between border-b border-stone-900 pb-1">
+            <span class="text-stone-500">KIERUNEK:</span>
+            <span class="font-bold {% if kierunek == 'LONG' %}text-emerald-400{% else %}text-rose-400{% endif %}">{{ kierunek }}</span>
+        </div>
+        <div class="flex justify-between border-b border-stone-900 pb-1">
+            <span class="text-stone-500">CENA WEJŚCIA:</span>
+            <span class="text-stone-200 font-bold">{{ cena_wejscia }}</span>
+        </div>
+        <div class="flex justify-between border-b border-stone-900 pb-1">
+            <span class="text-stone-500">ZAANGAŻOWANIE:</span>
+            <span class="text-purple-400 font-bold">{{ kwota_pozycji }} USDC</span>
+        </div>
+        <div class="flex justify-between border-b border-stone-900 pb-1">
+            <span class="text-stone-500">STOP LOSS:</span>
+            <span class="text-rose-400 font-bold">{{ stop_loss }}</span>
+        </div>
+        <div class="flex justify-between border-b border-stone-900 pb-1">
+            <span class="text-stone-500">PARAMETRY RYNKU:</span>
+            <span class="text-stone-300">RSI: {{ aktualne_rsi }} | HAŁAS: {{ poziom_halasu }}</span>
+        </div>
+        <div class="flex justify-between border-b border-stone-900 pb-1">
+            <span class="text-stone-500">RANGA STRZAŁU:</span>
+            <span class="text-amber-500 font-bold uppercase">{{ ranga_strzalu }}</span>
+        </div>
+        {% if komentarz %}
+        <div class="pt-1">
+            <span class="text-stone-500 block">NOTATKA STRATEGICZNA:</span>
+            <p class="text-[11px] text-stone-400 italic bg-stone-900/50 p-2 rounded border border-stone-900 mt-1">"{{ komentarz }}"</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <form hx-post="/hud/strzal" hx-target="#app-container" hx-swap="innerHTML" class="space-y-2">
+        <input type="hidden" name="aktywo" value="{{ aktywo }}">
+        <input type="hidden" name="interwal" value="{{ interwal }}">
+        <input type="hidden" name="kierunek" value="{{ kierunek }}">
+        <input type="hidden" name="cena_wejscia" value="{{ cena_wejscia }}">
+        <input type="hidden" name="kwota_pozycji" value="{{ kwota_pozycji }}">
+        <input type="hidden" name="aktualne_rsi" value="{{ aktualne_rsi }}">
+        <input type="hidden" name="stop_loss" value="{{ stop_loss }}">
+        <input type="hidden" name="poziom_halasu" value="{{ poziom_halasu }}">
+        <input type="hidden" name="ranga_strzalu" value="{{ ranga_strzalu }}">
+        {% if komentarz %}<input type="hidden" name="komentarz" value="{{ komentarz }}">{% endif %}
+
+        <button type="submit" 
+                class="w-full bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white font-mono uppercase tracking-widest text-sm font-bold py-3 rounded-xl shadow-lg shadow-rose-950/40 transition-all cursor-pointer">
+            💥 ZATWIERDŹ I WYKONAJ STRZAŁ
+        </button>
+
+        <button type="button" hx-get="/auth/hud" hx-target="#app-container" hx-swap="innerHTML"
+                class="w-full bg-stone-950 hover:bg-stone-900 text-stone-500 hover:text-stone-300 font-mono text-xs uppercase py-2 rounded-lg border border-stone-800 transition-all cursor-pointer">
+            Abort (Anuluj i resetuj)
+        </button>
+    </form>
+</div>

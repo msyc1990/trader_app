@@ -1,0 +1,39 @@
+<div id="kontener-kroku" class="space-y-4">
+    <div class="flex justify-between items-center bg-stone-950 p-2 rounded-lg border border-stone-800">
+        <span class="text-xs font-mono text-purple-400">ETAP 1 z 4</span>
+        <span class="text-[10px] font-mono text-stone-500 uppercase">Inicjalizacja Pozycji</span>
+    </div>
+
+    <form hx-post="/hud/krok2" hx-target="#kontener-kroku" hx-swap="outerHTML" class="space-y-4">
+        <div>
+            <label class="block text-xs font-mono uppercase text-stone-400 mb-1">Wybierz Aktywo</label>
+            <select name="aktywo" class="w-full bg-stone-950 border border-stone-800 rounded-lg px-3 py-2 text-stone-100 font-mono focus:outline-none focus:border-purple-500">
+                <option value="BTC">BTC / Bitcoin</option>
+                <option value="ETH">ETH / Ethereum</option>
+                <option value="SOL">SOL / Solana</option>
+            </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+            <div>
+                <label class="block text-xs font-mono uppercase text-stone-400 mb-1">Interwał</label>
+                <select name="interwal" class="w-full bg-stone-950 border border-stone-800 rounded-lg px-3 py-2 text-stone-100 font-mono focus:outline-none focus:border-purple-500">
+                    <option value="H1">H1 (1 Godzina)</option>
+                    <option value="H4">H4 (4 Godziny)</option>
+                    <option value="D1">D1 (1 Dzień)</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-mono uppercase text-stone-400 mb-1">Kierunek</label>
+                <select name="kierunek" class="w-full bg-stone-950 border border-stone-800 rounded-lg px-3 py-2 text-stone-100 font-mono focus:outline-none focus:border-purple-500">
+                    <option value="LONG">🟢 LONG (Kupno)</option>
+                    <option value="SHORT">🔴 SHORT (Sprzedaż)</option>
+                </select>
+            </div>
+        </div>
+
+        <button type="submit" class="w-full bg-stone-800 hover:bg-purple-600 text-stone-300 hover:text-white font-mono text-xs uppercase tracking-wider py-2.5 rounded-lg border border-stone-700 hover:border-purple-500 transition-all cursor-pointer">
+            Analizuj Otoczenie (Dalej) ->
+        </button>
+    </form>
+</div>
