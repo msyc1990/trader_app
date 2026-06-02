@@ -1,0 +1,41 @@
+{% extends "baza.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center border-b border-stone-800 pb-4">
+        <div>
+            <h2 class="text-xl font-bold text-purple-400 font-mono tracking-wider">SNIPER HUD</h2>
+            <p class="text-xs text-stone-500 font-mono">OPERATOR: <span class="text-stone-300 font-bold">{{ uzytkownik.username }}</span></p>
+        </div>
+        <div class="text-right">
+            <span class="text-xs font-mono uppercase tracking-wider text-stone-500 block">Status</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-purple-950 text-purple-400 border border-purple-800 animate-pulse">
+                {{ uzytkownik.status_snajpera }}
+            </span>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+        <div class="bg-stone-950/50 border border-stone-800 p-3 rounded-xl font-mono">
+            <span class="text-xs text-stone-500 block">KAPITAŁ</span>
+            <span class="text-lg font-bold text-stone-100">{{ "%.2f"|format(uzytkownik.kapital) }} USDC</span>
+        </div>
+        <div class="bg-stone-950/50 border border-stone-800 p-3 rounded-xl font-mono">
+            <span class="text-xs text-stone-500 block">MAGAZYNEK</span>
+            <span class="text-lg font-bold text-amber-500">⚡ MULTI-USER READY</span>
+        </div>
+    </div>
+
+    <div id="formularz-rygoru" class="border border-stone-800 bg-stone-950/30 p-4 rounded-xl">
+        <p class="text-sm font-mono text-stone-400 text-center py-4">
+            [Tutaj w kolejnym kroku wstrzykniemy Twój 4-krokowy system weryfikacji transakcji przez HTMX]
+        </p>
+    </div>
+
+    <div class="text-center pt-2">
+        <a href="/auth/logowanie" class="text-xs text-stone-600 hover:text-rose-400 font-mono transition-colors">
+            Przerwij sesję (Wyloguj)
+        </a>
+    </div>
+</div>
+{% endblock %}
