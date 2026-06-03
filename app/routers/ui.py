@@ -97,14 +97,14 @@ async def proces_logowania(
     )
 
 
-# --- ZMODYFIKOWANY ENDPOINT HUD ---
+# --- ZMODYFIKOWANY ENDPOINT HUD ZE STATYSTYKAMI ---
 
 @router.get("/hud", response_class=HTMLResponse)
 async def wyswietl_hud(
     request: Request, 
     session: Session = Depends(get_session)
 ) -> HTMLResponse:
-    """Pobiera użytkownika, otwarte pozycje oraz historię zamkniętych pozycji i wyświetla HUD."""
+    """Pobiera użytkownika, pozycje oraz wylicza statystyki i wyświetla HUD."""
     # 1. Pobieranie użytkownika
     uzytkownik = session.exec(select(Uzytkownik)).first()
     
@@ -114,13 +114,26 @@ async def wyswietl_hud(
             detail="Nie znaleziono żadnego użytkownika w bazie danych."
         )
     
-    # 2. Pobieranie wszystkich otwartych pozycji (Nienaruszone)
+    # 2. Pobieranie wszystkich otwartych pozycji
     statement_pozycje = select(Transakcja).where(Transakcja.status_pozycji == 'OTWARTA')
     otwarte_pozycje = session.exec(statement_pozycje).all()
     
-    # 3. NOWOŚĆ: Pobieranie historii zamkniętych pozycji
+    # 3. Pobieranie historii zamkniętych pozycji
     statement_zamkniete = select(Transakcja).where(Transakcja.status_pozycji == 'ZAMKNIETA')
     zamkniete_pozycje = session.exec(statement_zamkniete).all()
+    
+    # 4. NOWOŚĆ: Obliczanie statystyk tradingowych na podstawie zamkniętych pozycji
+    total_pnl = sum(p.wynik_finansowy for p in zamkniete_pozycje if p.wynik_finansowy is not None)
+    liczba_zamknietych = len(zamkniete_pozycje)
+    
+    pozycje_zyskowne = sum(1 for p in zamkniete_pozycje if p.wynik_finansowy is not None and p.wynik_finansowy > 0)
+    
+    if liczba_zamknietych > 0:
+        win_rate = round((pozycje_zyskowne / liczba_zamknietych) * 100, 1)
+    else:
+        win_rate = 0.0
+        
+    laczna_liczba_strzalow = len(otwarte_pozycje) + liczba_zamknietych
         
     return templates.TemplateResponse(
         request=request,
@@ -128,7 +141,10 @@ async def wyswietl_hud(
         context={
             "uzytkownik": uzytkownik,
             "pozycje": otwarte_pozycje,
-            "historia": zamkniete_pozycje
+            "historia": zamkniete_pozycje,
+            "total_pnl": round(total_pnl, 2),  # Zaokrąglenie wyniku finansowego do 2 miejsc
+            "win_rate": win_rate,
+            "laczna_liczba_strzalow": laczna_liczba_strzalow
         }
     )
 

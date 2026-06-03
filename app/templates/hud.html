@@ -15,9 +15,30 @@
         </div>
     </div>
 
+    <div class="grid grid-cols-3 gap-2 font-mono text-center">
+        <div class="bg-stone-950 border border-stone-800 p-2 rounded-xl">
+            <span class="text-[9px] text-stone-500 block uppercase tracking-wider">Win Rate</span>
+            <span class="text-sm font-bold {% if win_rate >= 50 %}text-emerald-400{% elif win_rate > 0 %}text-amber-500{% else %}text-stone-400{% endif %}">
+                {{ win_rate }}%
+            </span>
+        </div>
+        <div class="bg-stone-950 border border-stone-800 p-2 rounded-xl">
+            <span class="text-[9px] text-stone-500 block uppercase tracking-wider">Total PnL</span>
+            <span class="text-sm font-bold {% if total_pnl > 0 %}text-emerald-400{% elif total_pnl < 0 %}text-rose-500{% else %}text-stone-400{% endif %}">
+                {% if total_pnl > 0 %}+{% endif %}{{ "%.2f"|format(total_pnl) }}
+            </span>
+        </div>
+        <div class="bg-stone-950 border border-stone-800 p-2 rounded-xl">
+            <span class="text-[9px] text-stone-500 block uppercase tracking-wider">Strzały</span>
+            <span class="text-sm font-bold text-purple-400">
+                {{ laczna_liczba_strzalow }}
+            </span>
+        </div>
+    </div>
+
     <div class="grid grid-cols-2 gap-4">
         <div class="bg-stone-950/50 border border-stone-800 p-3 rounded-xl font-mono">
-            <span class="text-xs text-stone-500 block">KAPITAŁ</span>
+            <span class="text-xs text-stone-500 block">KAPITAŁ VOLATILE</span>
             <span class="text-lg font-bold text-stone-100">{{ "%.2f"|format(uzytkownik.kapital) }} USDC</span>
         </div>
         <div class="bg-stone-950/50 border border-stone-800 p-3 rounded-xl font-mono">
