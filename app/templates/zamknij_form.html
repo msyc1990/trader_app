@@ -1,0 +1,22 @@
+<div id="pozycja-row-{{ pozycja.id }}" class="bg-stone-950 border border-rose-900/30 p-3 rounded-xl font-mono text-xs animate-fade-in">
+    <form hx-post="/auth/hud/pozycja/{{ pozycja.id }}/rozlicz" hx-target="#app-container" hx-swap="innerHTML" class="flex flex-col sm:flex-row gap-2 justify-between items-center w-full">
+        <div class="text-left w-full sm:w-auto">
+            <span class="text-rose-400 font-bold block">ZAMYKANIE: {{ pozycja.aktywo }}</span>
+            <span class="text-[10px] text-stone-500">Cena wejścia: {{ pozycja.cena_wejscia }}</span>
+        </div>
+        
+        <div class="flex gap-2 w-full sm:w-auto justify-end">
+            <input type="number" name="cena_wyjscia" step="0.000001" required placeholder="Cena wyjścia" autocomplete="off"
+                   class="bg-stone-900 border border-stone-800 rounded-lg px-2 py-1 text-stone-100 focus:outline-none focus:border-rose-500 font-mono text-xs w-32">
+            
+            <button type="button" hx-get="/auth/hud" hx-target="#app-container" hx-swap="innerHTML"
+                    class="bg-stone-900 text-stone-500 px-2 py-1 rounded border border-stone-800 text-[11px] cursor-pointer">
+                Anuluj
+            </button>
+            <button type="submit" 
+                    class="bg-rose-600 hover:bg-rose-500 text-white font-bold px-3 py-1 rounded text-[11px] cursor-pointer transition-colors">
+                Rozlicz
+            </button>
+        </div>
+    </form>
+</div>

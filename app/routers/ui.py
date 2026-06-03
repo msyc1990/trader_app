@@ -97,14 +97,15 @@ async def proces_logowania(
     )
 
 
-# --- ENDPOINT HUD ---
+# --- ZMODYFIKOWANY ENDPOINT HUD ---
 
 @router.get("/hud", response_class=HTMLResponse)
 async def wyswietl_hud(
     request: Request, 
     session: Session = Depends(get_session)
 ) -> HTMLResponse:
-    """Pobiera pierwszego użytkownika z bazy danych i wyświetla panel główny HUD."""
+    """Pobiera użytkownika, otwarte pozycje oraz historię zamkniętych pozycji i wyświetla HUD."""
+    # 1. Pobieranie użytkownika
     uzytkownik = session.exec(select(Uzytkownik)).first()
     
     if not uzytkownik:
@@ -112,11 +113,23 @@ async def wyswietl_hud(
             status_code=status.HTTP_404_NOT_FOUND, 
             detail="Nie znaleziono żadnego użytkownika w bazie danych."
         )
+    
+    # 2. Pobieranie wszystkich otwartych pozycji (Nienaruszone)
+    statement_pozycje = select(Transakcja).where(Transakcja.status_pozycji == 'OTWARTA')
+    otwarte_pozycje = session.exec(statement_pozycje).all()
+    
+    # 3. NOWOŚĆ: Pobieranie historii zamkniętych pozycji
+    statement_zamkniete = select(Transakcja).where(Transakcja.status_pozycji == 'ZAMKNIETA')
+    zamkniete_pozycje = session.exec(statement_zamkniete).all()
         
     return templates.TemplateResponse(
         request=request,
         name="hud.html",
-        context={"uzytkownik": uzytkownik}
+        context={
+            "uzytkownik": uzytkownik,
+            "pozycje": otwarte_pozycje,
+            "historia": zamkniete_pozycje
+        }
     )
 
 
@@ -211,7 +224,7 @@ async def proces_krok4(
     )
 
 
-# --- FINALNY ENDPOINT: REJESTRACJA TRANSAKCJI (STRZAŁ) ---
+# --- ENDPOINT: REJESTRACJA TRANSAKCJI (STRZAŁ) ---
 
 @router.post("/hud/strzal", response_class=HTMLResponse)
 async def proces_strzalu(
@@ -228,7 +241,6 @@ async def proces_strzalu(
     session: Session = Depends(get_session)
 ) -> HTMLResponse:
     """Finalizuje transakcję: sprawdza fundusze, aktualizuje kapitał i zapisuje pozycję."""
-    # 1. Pobranie użytkownika
     uzytkownik = session.exec(select(Uzytkownik)).first()
     if not uzytkownik:
         raise HTTPException(
@@ -236,18 +248,15 @@ async def proces_strzalu(
             detail="Nie znaleziono żadnego użytkownika w bazie danych."
         )
 
-    # 2. Walidacja funduszy portfela
     if uzytkownik.kapital < kwota_pozycji:
         return HTMLResponse(
             content="Błąd: Brak wystarczających funduszy (kapitału) na otwarcie tej pozycji!",
             headers={"HX-Retarget": "#error-message"}
         )
 
-    # 3. Aktualizacja kapitału użytkownika (zamrożenie środków pod pozycję)
     uzytkownik.kapital -= kwota_pozycji
     session.add(uzytkownik)
 
-    # 4. Tworzenie i konfiguracja nowego obiektu Transakcja
     nowa_transakcja = Transakcja(
         aktywo=aktywo,
         interwal=interwal,
@@ -262,11 +271,81 @@ async def proces_strzalu(
         status_pozycji="OTWARTA"
     )
 
-    # 5. Zapisanie danych w bazie (ACID atomowość)
     session.add(nowa_transakcja)
     session.commit()
 
-    # 6. Wymuszenie pełnego odświeżenia HUD-a przez HTMX ze zaktualizowanym kapitałem
+    return HTMLResponse(
+        content="",
+        headers={"HX-Redirect": "/auth/hud"}
+    )
+
+
+# --- ENDPOINT: FORMULARZ ZAMKNIĘCIA POZYCJI ---
+
+@router.post("/hud/pozycja/{id}/zamknij-widok", response_class=HTMLResponse)
+async def wyswietl_zamknij_widok(
+    id: int,
+    request: Request,
+    session: Session = Depends(get_session)
+) -> HTMLResponse:
+    """Pobiera transakcję po ID i zwraca szablon formularza zamknięcia pozycji."""
+    pozycja = session.get(Transakcja, id)
+    
+    if not pozycja:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Nie znaleziono transakcji o ID {id}."
+        )
+        
+    return templates.TemplateResponse(
+        request=request,
+        name="zamknij_form.html",
+        context={"pozycja": pozycja}
+    )
+
+
+# --- ENDPOINT: ROZLICZENIE TRANSAKCJI (FINISH) ---
+
+@router.post("/hud/pozycja/{id}/rozlicz", response_class=HTMLResponse)
+async def rozlicz_pozycja(
+    id: int,
+    cena_wyjscia: float = Form(...),
+    session: Session = Depends(get_session)
+) -> HTMLResponse:
+    """Wylicza PnL zamkniętej pozycji, aktualizuje stan transakcji oraz kapitał tradera."""
+    transakcja = session.get(Transakcja, id)
+    uzytkownik = session.exec(select(Uzytkownik)).first()
+
+    if not transakcja:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Nie znaleziono transakcji o ID {id}."
+        )
+    if not uzytkownik:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Nie znaleziono użytkownika dla rozliczenia kapitału."
+        )
+
+    zmiana = (cena_wyjscia - transakcja.cena_wejscia) / transakcja.cena_wejscia
+
+    if transakcja.kierunek.upper() == "LONG":
+        wynik_finansowy = transakcja.kwota_pozycji * zmiana
+    elif transakcja.kierunek.upper() == "SHORT":
+        wynik_finansowy = transakcja.kwota_pozycji * (-zmiana)
+    else:
+        wynik_finansowy = 0.0
+
+    transakcja.cena_wyjscia = cena_wyjscia
+    transakcja.wynik_finansowy = round(wynik_finansowy, 2)
+    transakcja.status_pozycji = "ZAMKNIETA"
+
+    uzytkownik.kapital += (transakcja.kwota_pozycji + wynik_finansowy)
+
+    session.add(transakcja)
+    session.add(uzytkownik)
+    session.commit()
+
     return HTMLResponse(
         content="",
         headers={"HX-Redirect": "/auth/hud"}

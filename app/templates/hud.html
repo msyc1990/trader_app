@@ -22,14 +22,93 @@
         </div>
         <div class="bg-stone-950/50 border border-stone-800 p-3 rounded-xl font-mono">
             <span class="text-xs text-stone-500 block">MAGAZYNEK</span>
-            <span class="text-lg font-bold text-amber-500">⚡ MULTI-USER READY</span>
+            <span class="text-lg font-bold text-amber-500">⚡ AKTIV-MULTI</span>
         </div>
     </div>
 
     <div id="formularz-rygoru" class="border border-stone-800 bg-stone-950/30 p-4 rounded-xl">
-        <p class="text-sm font-mono text-stone-400 text-center py-4">
-            {% include "krok1.html" %}
-        </p>
+        {% include "krok1.html" %}
+    </div>
+
+    <div class="space-y-3">
+        <h3 class="text-xs font-mono uppercase tracking-widest text-stone-500 font-bold">Dziennik Operacyjny (Otwarte pozycje)</h3>
+        
+        <div id="lista-pozycji" class="space-y-2">
+            {% if pozycje %}
+                {% for pozycja in pozycje %}
+                <div id="pozycja-row-{{ pozycja.id }}" class="bg-stone-950 border border-stone-800 p-3 rounded-xl flex justify-between items-center font-mono text-xs transition-all">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-stone-200">{{ pozycja.aktywo }}</span>
+                            <span class="text-[10px] text-stone-500">({{ pozycja.interwal }})</span>
+                            <span class="text-[10px] px-1 rounded font-bold {% if pozycja.kierunek == 'LONG' %}bg-emerald-950 text-emerald-400 border border-emerald-900{% else %}bg-rose-950 text-rose-400 border border-rose-900{% endif %}">
+                                {{ pozycja.kierunek }}
+                            </span>
+                        </div>
+                        <div class="text-[11px] text-stone-400 mt-1 space-x-2">
+                            <span>In: <b class="text-stone-300">{{ pozycja.cena_wejscia }}</b></span>
+                            <span>Size: <b class="text-purple-400">{{ pozycja.kwota_pozycji }} USDC</b></span>
+                        </div>
+                    </div>
+                    
+                    <div class="text-right flex items-center gap-3">
+                        <div class="hidden sm:block text-[11px]">
+                            <span class="text-stone-600 block text-[10px]">STOP LOSS</span>
+                            <span class="text-rose-500 font-bold">{{ pozycja.stop_loss }}</span>
+                        </div>
+                        
+                        <button hx-post="/auth/hud/pozycja/{{ pozycja.id }}/zamknij-widok" 
+                                hx-target="#pozycja-row-{{ pozycja.id }}" 
+                                hx-swap="outerHTML"
+                                class="bg-stone-900 hover:bg-rose-950 text-stone-400 hover:text-rose-400 border border-stone-800 hover:border-rose-900 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer">
+                            💥 Zamknij
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p class="text-stone-600 text-center text-xs font-mono py-2 border border-dashed border-stone-900 rounded-xl">
+                    Brak aktywnych pozycji na rynku.
+                </p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="space-y-3 pt-2">
+        <h3 class="text-xs font-mono uppercase tracking-widest text-stone-500 font-bold">Archiwum Strzałów (Historia)</h3>
+        
+        <div id="archiwum-pozycji" class="space-y-2">
+            {% if historia %}
+                {% for poz in historia %}
+                <div class="bg-stone-950/40 border border-stone-900 p-3 rounded-xl flex justify-between items-center font-mono text-xs opacity-75 hover:opacity-100 transition-opacity">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-stone-400">{{ poz.aktywo }}</span>
+                            <span class="text-[10px] text-stone-600">({{ poz.interwal }})</span>
+                            <span class="text-[10px] px-1 rounded text-stone-400 bg-stone-900 border border-stone-800">
+                                {{ poz.kierunek }}
+                            </span>
+                        </div>
+                        <div class="text-[11px] text-stone-500 mt-1 space-x-2">
+                            <span>In: <b>{{ poz.cena_wejscia }}</b></span>
+                            <span>Out: <b>{{ poz.cena_wyjscia }}</b></span>
+                        </div>
+                    </div>
+                    
+                    <div class="text-right">
+                        <span class="text-[10px] text-stone-600 block uppercase">Wynik Netto</span>
+                        <span class="font-bold text-sm {% if poz.wynik_finansowy >= 0 %}text-emerald-400{% else %}text-rose-500{% endif %}">
+                            {% if poz.wynik_finansowy >= 0 %}+{% endif %}{{ "%.2f"|format(poz.wynik_finansowy) }} USDC
+                        </span>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p class="text-stone-700 text-center text-xs font-mono py-2 border border-dashed border-stone-950 rounded-xl">
+                    Księga historyczna jest pusta. Rozlicz pierwszą pozycję.
+                </p>
+            {% endif %}
+        </div>
     </div>
 
     <div class="text-center pt-2">
