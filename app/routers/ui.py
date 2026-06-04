@@ -2,41 +2,54 @@ from typing import Generator, Optional
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from itsdangerous import Signer, BadSignature
 from passlib.context import CryptContext
 from sqlmodel import Session, select
 
 from app.database import get_session
 from app.models import Uzytkownik, Transakcja
 
+SECRET_KEY = "twoj-bardzo-tajny-klucz-snajpera"
+signer = Signer(SECRET_KEY)
+
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# PROFESJONALNA POPRAWKA: Ścieżka uwzględniająca folder app/
-templates = Jinja2Templates(directory="app/app/templates" if False else "app/templates")
+templates = Jinja2Templates(directory="app/templates")
 
 
-# --- ENDPOINTY GET (Wyświetlanie formularzy) ---
+async def get_current_user(request: Request, session: Session = Depends(get_session)) -> Uzytkownik:
+    session_cookie = request.cookies.get("session_id")
+    if not session_cookie:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Brak aktywnej sesji.")
+    try:
+        unsigned_id = signer.unsign(session_cookie).decode()
+        user_id = int(unsigned_id)
+    except (BadSignature, ValueError):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Niepoprawna sesja.")
+
+    uzytkownik = session.get(Uzytkownik, user_id)
+    if not uzytkownik:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Użytkownik nie istnieje.")
+    return uzytkownik
+
+
+# --- ENDPOINTY GET ---
 
 @router.get("/logowanie", response_class=HTMLResponse)
 async def wyswietl_logowanie(request: Request) -> HTMLResponse:
     """Zwraca widok strony logowania."""
-    return templates.TemplateResponse(
-        request=request, 
-        name="logowanie.html"
-    )
+    return templates.TemplateResponse(request=request, name="logowanie.html")
 
 
 @router.get("/rejestracja", response_class=HTMLResponse)
 async def wyswietl_rejestracje(request: Request) -> HTMLResponse:
     """Zwraca widok strony rejestracji."""
-    return templates.TemplateResponse(
-        request=request, 
-        name="rejestracja.html"
-    )
+    return templates.TemplateResponse(request=request, name="rejestracja.html")
 
 
-# --- ENDPOINTY POST (Przetwarzanie danych z formularzy) ---
+# --- ENDPOINTY POST (AUTORYZACJA) ---
 
 @router.post("/rejestracja", response_class=HTMLResponse)
 async def proces_rejestracji(
@@ -46,7 +59,6 @@ async def proces_rejestracji(
     kapital: float = Form(...),
     session: Session = Depends(get_session)
 ) -> HTMLResponse:
-    """Przetwarza formularz rejestracji, tworząc nowego użytkownika w bazie."""
     statement = select(Uzytkownik).where(Uzytkownik.username == username)
     istniejacy_uzytkownik = session.exec(statement).first()
 
@@ -65,7 +77,6 @@ async def proces_rejestracji(
 
     session.add(nowy_uzytkownik)
     session.commit()
-    session.refresh(nowy_uzytkownik)
 
     return templates.TemplateResponse(
         request=request,
@@ -81,7 +92,6 @@ async def proces_logowania(
     password: str = Form(...),
     session: Session = Depends(get_session)
 ) -> HTMLResponse:
-    """Weryfikuje dane logowania użytkownika."""
     statement = select(Uzytkownik).where(Uzytkownik.username == username)
     uzytkownik = session.exec(statement).first()
 
@@ -91,48 +101,44 @@ async def proces_logowania(
             headers={"HX-Retarget": "#error-message"}
         )
 
-    return HTMLResponse(
-        content="",
-        headers={"HX-Redirect": "/auth/hud"}
-    )
+    # NOWOŚĆ: Generowanie podpisanego ciasteczka sesji
+    signed_id = signer.sign(str(uzytkownik.id).encode()).decode()
+    
+    response = HTMLResponse(content="", headers={"HX-Redirect": "/auth/hud"})
+    # Zapisujemy ciasteczko bezpiecznie (httponly chroni przed atakami XSS)
+    response.set_cookie(key="session_id", value=signed_id, httponly=True, path="/")
+    return response
 
 
-# --- ZMODYFIKOWANY ENDPOINT HUD ZE STATYSTYKAMI ---
+# --- BEZPIECZNY ENDPOINT HUD (POWIĄZANY Z SESJĄ) ---
 
 @router.get("/hud", response_class=HTMLResponse)
 async def wyswietl_hud(
     request: Request, 
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    uzytkownik: Uzytkownik = Depends(get_current_user)  # WTRZYKNIĘCIE SESJI
 ) -> HTMLResponse:
-    """Pobiera użytkownika, pozycje oraz wylicza statystyki i wyświetla HUD."""
-    # 1. Pobieranie użytkownika
-    uzytkownik = session.exec(select(Uzytkownik)).first()
+    """Pobiera zalogowanego użytkownika, JEGO pozycje oraz JEGO historię."""
     
-    if not uzytkownik:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail="Nie znaleziono żadnego użytkownika w bazie danych."
-        )
-    
-    # 2. Pobieranie wszystkich otwartych pozycji
-    statement_pozycje = select(Transakcja).where(Transakcja.status_pozycji == 'OTWARTA')
+    # Filtrowanie aktywnych pozycji należących tylko do zalogowanego użytkownika
+    statement_pozycje = select(Transakcja).where(
+        Transakcja.status_pozycji == 'OTWARTA',
+        Transakcja.uzytkownik_id == uzytkownik.id
+    )
     otwarte_pozycje = session.exec(statement_pozycje).all()
     
-    # 3. Pobieranie historii zamkniętych pozycji
-    statement_zamkniete = select(Transakcja).where(Transakcja.status_pozycji == 'ZAMKNIETA')
+    # Filtrowanie zamkniętych pozycji należących tylko do zalogowanego użytkownika
+    statement_zamkniete = select(Transakcja).where(
+        Transakcja.status_pozycji == 'ZAMKNIETA',
+        Transakcja.uzytkownik_id == uzytkownik.id
+    )
     zamkniete_pozycje = session.exec(statement_zamkniete).all()
     
-    # 4. NOWOŚĆ: Obliczanie statystyk tradingowych na podstawie zamkniętych pozycji
     total_pnl = sum(p.wynik_finansowy for p in zamkniete_pozycje if p.wynik_finansowy is not None)
     liczba_zamknietych = len(zamkniete_pozycje)
-    
     pozycje_zyskowne = sum(1 for p in zamkniete_pozycje if p.wynik_finansowy is not None and p.wynik_finansowy > 0)
     
-    if liczba_zamknietych > 0:
-        win_rate = round((pozycje_zyskowne / liczba_zamknietych) * 100, 1)
-    else:
-        win_rate = 0.0
-        
+    win_rate = round((pozycje_zyskowne / liczba_zamknietych) * 100, 1) if liczba_zamknietych > 0 else 0.0
     laczna_liczba_strzalow = len(otwarte_pozycje) + liczba_zamknietych
         
     return templates.TemplateResponse(
@@ -142,14 +148,14 @@ async def wyswietl_hud(
             "uzytkownik": uzytkownik,
             "pozycje": otwarte_pozycje,
             "historia": zamkniete_pozycje,
-            "total_pnl": round(total_pnl, 2),  # Zaokrąglenie wyniku finansowego do 2 miejsc
+            "total_pnl": round(total_pnl, 2),
             "win_rate": win_rate,
             "laczna_liczba_strzalow": laczna_liczba_strzalow
         }
     )
 
 
-# --- ENDPOINT KROK 2 (Wstrzykiwany dynamicznie przez HTMX) ---
+# --- DYNAMICZNE FORMULARZE RYGORU (BEZMIAN) ---
 
 @router.post("/hud/krok2", response_class=HTMLResponse)
 async def proces_krok2(
@@ -158,19 +164,12 @@ async def proces_krok2(
     interwal: str = Form(...),
     kierunek: str = Form(...)
 ) -> HTMLResponse:
-    """Odbiera wstępne parametry transakcji z formularza HUD i renderuje krok 2."""
     return templates.TemplateResponse(
         request=request,
         name="krok2.html",
-        context={
-            "aktywo": aktywo,
-            "interwal": interwal,
-            "kierunek": kierunek
-        }
+        context={"aktywo": aktywo, "interwal": interwal, "kierunek": kierunek}
     )
 
-
-# --- ENDPOINT KROK 3 (Obliczenia obronne i podsumowanie) ---
 
 @router.post("/hud/krok3", response_class=HTMLResponse)
 async def proces_krok3(
@@ -182,30 +181,17 @@ async def proces_krok3(
     kwota_pozycji: float = Form(...),
     aktualne_rsi: float = Form(...)
 ) -> HTMLResponse:
-    """Odbiera dane szczegółowe, wylicza automatyczny Stop Loss i renderuje krok 3."""
-    if kierunek.upper() == "LONG":
-        stop_loss = cena_wejscia * 0.98
-    elif kierunek.upper() == "SHORT":
-        stop_loss = cena_wejscia * 1.02
-    else:
-        stop_loss = cena_wejscia
-
+    stop_loss = cena_wejscia * 0.98 if kierunek.upper() == "LONG" else cena_wejscia * 1.02
     return templates.TemplateResponse(
         request=request,
         name="krok3.html",
         context={
-            "aktywo": aktywo,
-            "interwal": interwal,
-            "kierunek": kierunek,
-            "cena_wejscia": cena_wejscia,
-            "kwota_pozycji": kwota_pozycji,
-            "aktualne_rsi": aktualne_rsi,
-            "stop_loss": round(stop_loss, 4)
+            "aktywo": aktywo, "interwal": interwal, "kierunek": kierunek,
+            "cena_wejscia": cena_wejscia, "kwota_pozycji": kwota_pozycji,
+            "aktualne_rsi": aktualne_rsi, "stop_loss": round(stop_loss, 4)
         }
     )
 
-
-# --- ENDPOINT KROK 4 (Ostateczna walidacja przed strzałem) ---
 
 @router.post("/hud/krok4", response_class=HTMLResponse)
 async def proces_krok4(
@@ -221,26 +207,20 @@ async def proces_krok4(
     ranga_strzalu: str = Form(...),
     komentarz: Optional[str] = Form(None)
 ) -> HTMLResponse:
-    """Zbiera absolutnie wszystkie parametry z poprzednich kroków i wyświetla krok 4."""
     return templates.TemplateResponse(
         request=request,
         name="krok4.html",
         context={
-            "aktywo": aktywo,
-            "interwal": interwal,
-            "kierunek": kierunek,
-            "cena_wejscia": cena_wejscia,
-            "kwota_pozycji": kwota_pozycji,
-            "aktualne_rsi": aktualne_rsi,
-            "stop_loss": stop_loss,
-            "poziom_halasu": poziom_halasu,
-            "ranga_strzalu": ranga_strzalu,
+            "aktywo": aktywo, "interwal": interwal, "kierunek": kierunek,
+            "cena_wejscia": cena_wejscia, "kwota_pozycji": kwota_pozycji,
+            "aktualne_rsi": aktualne_rsi, "stop_loss": stop_loss,
+            "poziom_halasu": poziom_halasu, "ranga_strzalu": ranga_strzalu,
             "komentarz": komentarz
         }
     )
 
 
-# --- ENDPOINT: REJESTRACJA TRANSAKCJI (STRZAŁ) ---
+# --- STRZAŁ Z POWIĄZANIEM USER_ID ---
 
 @router.post("/hud/strzal", response_class=HTMLResponse)
 async def proces_strzalu(
@@ -254,19 +234,12 @@ async def proces_strzalu(
     poziom_halasu: str = Form(...),
     ranga_strzalu: str = Form(...),
     komentarz: Optional[str] = Form(None),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    uzytkownik: Uzytkownik = Depends(get_current_user)  # ZEZWOLENIE Z SESJI
 ) -> HTMLResponse:
-    """Finalizuje transakcję: sprawdza fundusze, aktualizuje kapitał i zapisuje pozycję."""
-    uzytkownik = session.exec(select(Uzytkownik)).first()
-    if not uzytkownik:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Nie znaleziono żadnego użytkownika w bazie danych."
-        )
-
     if uzytkownik.kapital < kwota_pozycji:
         return HTMLResponse(
-            content="Błąd: Brak wystarczających funduszy (kapitału) na otwarcie tej pozycji!",
+            content="Błąd: Brak funduszy na tę pozycję!",
             headers={"HX-Retarget": "#error-message"}
         )
 
@@ -274,6 +247,7 @@ async def proces_strzalu(
     session.add(uzytkownik)
 
     nowa_transakcja = Transakcja(
+        uzytkownik_id=uzytkownik.id,  # KLUCZOWE: Powiązanie z zalogowanym userem
         aktywo=aktywo,
         interwal=interwal,
         kierunek=kierunek,
@@ -290,67 +264,41 @@ async def proces_strzalu(
     session.add(nowa_transakcja)
     session.commit()
 
-    return HTMLResponse(
-        content="",
-        headers={"HX-Redirect": "/auth/hud"}
-    )
+    return HTMLResponse(content="", headers={"HX-Redirect": "/auth/hud"})
 
 
-# --- ENDPOINT: FORMULARZ ZAMKNIĘCIA POZYCJI ---
+# --- OBSŁUGA ROZLICZEŃ Z ZABEZPIECZENIEM ---
 
 @router.post("/hud/pozycja/{id}/zamknij-widok", response_class=HTMLResponse)
 async def wyswietl_zamknij_widok(
     id: int,
     request: Request,
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    uzytkownik: Uzytkownik = Depends(get_current_user)  # OBRONA PRZED INTRUZEM
 ) -> HTMLResponse:
-    """Pobiera transakcję po ID i zwraca szablon formularza zamknięcia pozycji."""
     pozycja = session.get(Transakcja, id)
     
-    if not pozycja:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Nie znaleziono transakcji o ID {id}."
-        )
+    # Defensywny warunek: nie pozwól zamknąć pozycji, jeśli nie należy do Ciebie!
+    if not pozycja or pozycja.uzytkownik_id != uzytkownik.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Brak uprawnień.")
         
-    return templates.TemplateResponse(
-        request=request,
-        name="zamknij_form.html",
-        context={"pozycja": pozycja}
-    )
+    return templates.TemplateResponse(request=request, name="zamknij_form.html", context={"pozycja": pozycja})
 
-
-# --- ENDPOINT: ROZLICZENIE TRANSAKCJI (FINISH) ---
 
 @router.post("/hud/pozycja/{id}/rozlicz", response_class=HTMLResponse)
 async def rozlicz_pozycja(
     id: int,
     cena_wyjscia: float = Form(...),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    uzytkownik: Uzytkownik = Depends(get_current_user)  # AUTORYZACJA
 ) -> HTMLResponse:
-    """Wylicza PnL zamkniętej pozycji, aktualizuje stan transakcji oraz kapitał tradera."""
     transakcja = session.get(Transakcja, id)
-    uzytkownik = session.exec(select(Uzytkownik)).first()
 
-    if not transakcja:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Nie znaleziono transakcji o ID {id}."
-        )
-    if not uzytkownik:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Nie znaleziono użytkownika dla rozliczenia kapitału."
-        )
+    if not transakcja or transakcja.uzytkownik_id != uzytkownik.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Brak uprawnień.")
 
     zmiana = (cena_wyjscia - transakcja.cena_wejscia) / transakcja.cena_wejscia
-
-    if transakcja.kierunek.upper() == "LONG":
-        wynik_finansowy = transakcja.kwota_pozycji * zmiana
-    elif transakcja.kierunek.upper() == "SHORT":
-        wynik_finansowy = transakcja.kwota_pozycji * (-zmiana)
-    else:
-        wynik_finansowy = 0.0
+    wynik_finansowy = transakcja.kwota_pozycji * zmiana if transakcja.kierunek.upper() == "LONG" else transakcja.kwota_pozycji * (-zmiana)
 
     transakcja.cena_wyjscia = cena_wyjscia
     transakcja.wynik_finansowy = round(wynik_finansowy, 2)
@@ -362,7 +310,4 @@ async def rozlicz_pozycja(
     session.add(uzytkownik)
     session.commit()
 
-    return HTMLResponse(
-        content="",
-        headers={"HX-Redirect": "/auth/hud"}
-    )
+    return HTMLResponse(content="", headers={"HX-Redirect": "/auth/hud"})

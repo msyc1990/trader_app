@@ -20,6 +20,7 @@ class Magazynek(SQLModel, table=True):
 
 class Transakcja(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    uzytkownik_id: int = Field(foreign_key="uzytkownik.id")
     aktywo: str  # BTC, ETH, BNB
     interwal: str  # H1, H4, D1
     kierunek: str  # LONG, SHORT
