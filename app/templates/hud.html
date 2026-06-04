@@ -47,8 +47,24 @@
         </div>
     </div>
 
-    <div id="formularz-rygoru" class="border border-stone-800 bg-stone-950/30 p-4 rounded-xl">
-        {% include "krok1.html" %}
+    <div id="formularz-rygoru" class="border border-stone-800 bg-stone-950/30 p-4 rounded-xl font-mono">
+        {% if uzytkownik.status_snajpera == 'BLOKADA' %}
+            <div class="text-center py-6 space-y-3 animate-pulse">
+                <div class="text-rose-500 text-2xl">⚠️</div>
+                <h3 class="text-rose-500 font-bold uppercase tracking-widest text-sm">TERMINAL ZABLOKOWANY</h3>
+                <p class="text-xs text-stone-400 max-w-xs mx-auto leading-relaxed">
+                    Strażnik Rygoru aktywował protokół ochronny kapitału po wykryciu <span class="text-rose-400 font-bold">3 strat z rzędu</span>. 
+                </p>
+                <div class="bg-rose-950/20 border border-rose-900/40 p-2 rounded-lg text-[11px] text-stone-300 inline-block">
+                    🔐 EMOCJE WYKRYTE. BLOKADA DO: <span class="text-rose-400 font-bold">{{ uzytkownik.blokada_do.strftime('%Y-%m-%d %H:%M') if uzytkownik.blokada_do else 'Brak danych' }} UTC</span>
+                </div>
+                <p class="text-[10px] text-stone-600 italic">
+                    Opuść stanowisko. Odpocznij i wróć ze świeżym umysłem.
+                </p>
+            </div>
+        {% else %}
+            {% include "krok1.html" %}
+        {% endif %}
     </div>
 
     <div class="space-y-3">

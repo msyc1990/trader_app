@@ -1,4 +1,5 @@
 from typing import Generator, Optional
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -119,6 +120,16 @@ async def wyswietl_hud(
     uzytkownik: Uzytkownik = Depends(get_current_user)  # WTRZYKNIĘCIE SESJI
 ) -> HTMLResponse:
     """Pobiera zalogowanego użytkownika, JEGO pozycje oraz JEGO historię."""
+    
+    # Sprawdzenie aktywnej blokady
+    if uzytkownik.blokada_do:
+        if datetime.utcnow() > uzytkownik.blokada_do:
+            # Czas blokady minął - automatyczne ułaskawienie
+            uzytkownik.status_snajpera = "CZUWANIE"
+            uzytkownik.blokada_do = None
+            uzytkownik.licznik_prob = 0
+            session.add(uzytkownik)
+            session.commit()
     
     # Filtrowanie aktywnych pozycji należących tylko do zalogowanego użytkownika
     statement_pozycje = select(Transakcja).where(
@@ -299,6 +310,21 @@ async def rozlicz_pozycja(
 
     zmiana = (cena_wyjscia - transakcja.cena_wejscia) / transakcja.cena_wejscia
     wynik_finansowy = transakcja.kwota_pozycji * zmiana if transakcja.kierunek.upper() == "LONG" else transakcja.kwota_pozycji * (-zmiana)
+
+    # --- SYSTEM BLOKADY KARCERA (3 STRATY Z RZĘDU) ---
+    if wynik_finansowy < 0:
+        # Strata - zwiększamy licznik
+        uzytkownik.licznik_prob = getattr(uzytkownik, 'licznik_prob', 0) + 1
+        
+        # Sprawdzamy, czy osiągnęliśmy limit 3 strat
+        if uzytkownik.licznik_prob >= 3:
+            uzytkownik.status_snajpera = 'BLOKADA'
+            uzytkownik.blokada_do = datetime.utcnow() + timedelta(hours=24)
+    else:
+        # Zysk lub wyjście na zero - resetujemy licznik
+        uzytkownik.licznik_prob = 0
+        uzytkownik.status_snajpera = 'CZUWANIE'
+        uzytkownik.blokada_do = None
 
     transakcja.cena_wyjscia = cena_wyjscia
     transakcja.wynik_finansowy = round(wynik_finansowy, 2)
