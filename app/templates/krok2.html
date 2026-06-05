@@ -10,9 +10,10 @@
         <input type="hidden" name="kierunek" value="{{ kierunek }}">
 
         <div>
-            <label class="block text-xs font-mono uppercase text-stone-400 mb-1">Cena Wejścia (Market/Limit)</label>
-            <input type="number" name="cena_wejscia" step="0.000001" required placeholder="np. 67450.50"
-                   class="w-full bg-stone-950 border border-stone-800 rounded-lg px-3 py-2 text-stone-100 font-mono focus:outline-none focus:border-purple-500">
+            <label class="text-[11px] text-stone-500 block uppercase mb-1">Cena Wejścia (Live z Binance)</label>
+            <input type="number" name="cena_wejscia" step="0.0001" required 
+           value="{{ cena_wejscia }}" 
+           class="w-full bg-stone-900 border border-stone-800 rounded-lg p-2 text-stone-100 focus:outline-none focus:border-purple-500 text-xs font-mono">
         </div>
 
         <div class="grid grid-cols-2 gap-3">

@@ -1,3 +1,4 @@
+import httpx
 from typing import Generator, Optional
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
@@ -186,6 +187,23 @@ async def wyswietl_hud(
 
 # --- DYNAMICZNE FORMULARZE RYGORU (BEZMIAN) ---
 
+async def pobierz_cene_na_zywo(aktywo: str) -> float:
+    """Pobiera aktualną cenę z Binance API. W razie błędu zwraca cenę awaryjną."""
+    symbol = f"{aktywo.upper()}USDC"
+    url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, timeout=3.0)
+            if response.status_code == 200:
+                data = response.json()
+                return float(data["price"])
+    except Exception:
+        pass
+    # Cena awaryjna (fallback) w razie braku sieci lub błędu API
+    ceny_awaryjne = {"BTC": 65000.0, "ETH": 35000.0, "BNB": 580.0}
+    return ceny_awaryjne.get(aktywo.upper(), 1.0)
+
+
 @router.post("/hud/krok2", response_class=HTMLResponse)
 async def proces_krok2(
     request: Request,
@@ -193,10 +211,16 @@ async def proces_krok2(
     interwal: str = Form(...),
     kierunek: str = Form(...)
 ) -> HTMLResponse:
+    cena_rynkowa = await pobierz_cene_na_zywo(aktywo)
     return templates.TemplateResponse(
         request=request,
         name="krok2.html",
-        context={"aktywo": aktywo, "interwal": interwal, "kierunek": kierunek}
+        context={
+            "aktywo": aktywo,
+            "interwal": interwal,
+            "kierunek": kierunek,
+            "cena_wejscia": round(cena_rynkowa, 4)
+        }
     )
 
 
