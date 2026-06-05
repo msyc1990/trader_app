@@ -8,7 +8,7 @@ from passlib.context import CryptContext
 from sqlmodel import Session, select
 
 from app.database import get_session
-from app.models import Uzytkownik, Transakcja
+from app.models import Uzytkownik, Transakcja, Magazynek
 
 SECRET_KEY = "twoj-bardzo-tajny-klucz-snajpera"
 signer = Signer(SECRET_KEY)
@@ -79,6 +79,15 @@ async def proces_rejestracji(
     session.add(nowy_uzytkownik)
     session.commit()
 
+    # Tworzenie magazynka dla nowego użytkownika
+    nowy_magazynek = Magazynek(
+        uzytkownik_id=nowy_uzytkownik.id,
+        dostepna_amunicja=3,
+        data_resetu=datetime.utcnow() + timedelta(days=7)
+    )
+    session.add(nowy_magazynek)
+    session.commit()
+
     return templates.TemplateResponse(
         request=request,
         name="logowanie.html",
@@ -111,7 +120,7 @@ async def proces_logowania(
     return response
 
 
-# --- BEZPIECZNY ENDPOINT HUD (POWIĄZANY Z SESJĄ) ---
+# --- BEZPIECZNY ENDPOINT HUD (Z LOGIKĄ REFRESHU MAGAZYNKA) ---
 
 @router.get("/hud", response_class=HTMLResponse)
 async def wyswietl_hud(
@@ -119,26 +128,34 @@ async def wyswietl_hud(
     session: Session = Depends(get_session),
     uzytkownik: Uzytkownik = Depends(get_current_user)  # WTRZYKNIĘCIE SESJI
 ) -> HTMLResponse:
-    """Pobiera zalogowanego użytkownika, JEGO pozycje oraz JEGO historię."""
+    """Pobiera zalogowanego użytkownika, obsługuje odnowienie amunicji, pobiera pozycje i historię."""
     
-    # Sprawdzenie aktywnej blokady
+    # 1. Sprawdzenie aktywnej blokady Karcera
     if uzytkownik.blokada_do:
         if datetime.utcnow() > uzytkownik.blokada_do:
-            # Czas blokady minął - automatyczne ułaskawienie
             uzytkownik.status_snajpera = "CZUWANIE"
             uzytkownik.blokada_do = None
             uzytkownik.licznik_prob = 0
             session.add(uzytkownik)
             session.commit()
+            
+    # 2. NOWOŚĆ: Pobranie magazynka i obsługa automatycznego odnowienia amunicji (Lazy Refresh)
+    magazynek = session.exec(select(Magazynek).where(Magazynek.uzytkownik_id == uzytkownik.id)).first()
+    if magazynek:
+        if datetime.utcnow() > magazynek.data_resetu:
+            magazynek.dostepna_amunicja = 3
+            magazynek.data_resetu = datetime.utcnow() + timedelta(days=7)
+            session.add(magazynek)
+            session.commit()
     
-    # Filtrowanie aktywnych pozycji należących tylko do zalogowanego użytkownika
+    # 3. Filtrowanie aktywnych pozycji użytkownika
     statement_pozycje = select(Transakcja).where(
         Transakcja.status_pozycji == 'OTWARTA',
         Transakcja.uzytkownik_id == uzytkownik.id
     )
     otwarte_pozycje = session.exec(statement_pozycje).all()
     
-    # Filtrowanie zamkniętych pozycji należących tylko do zalogowanego użytkownika
+    # 4. Filtrowanie zamkniętych pozycji użytkownika
     statement_zamkniete = select(Transakcja).where(
         Transakcja.status_pozycji == 'ZAMKNIETA',
         Transakcja.uzytkownik_id == uzytkownik.id
@@ -157,6 +174,7 @@ async def wyswietl_hud(
         name="hud.html",
         context={
             "uzytkownik": uzytkownik,
+            "magazynek": magazynek,  # KLUCZOWE: Przekazujemy magazynek do frontu!
             "pozycje": otwarte_pozycje,
             "historia": zamkniete_pozycje,
             "total_pnl": round(total_pnl, 2),
@@ -254,8 +272,22 @@ async def proces_strzalu(
             headers={"HX-Retarget": "#error-message"}
         )
 
+    # Pobierz magazynek zalogowanego użytkownika
+    magazynek = session.exec(select(Magazynek).where(Magazynek.uzytkownik_id == uzytkownik.id)).first()
+    
+    # Warunek bezpieczeństwa: czy jest magazynek i czy jest dostępna amunicja
+    if not magazynek or magazynek.dostepna_amunicja < 1:
+        return HTMLResponse(
+            content="Błąd: Brak dostępnej amunicji!",
+            headers={"HX-Retarget": "#error-message"}
+        )
+
     uzytkownik.kapital -= kwota_pozycji
     session.add(uzytkownik)
+
+    # Pomniejsz amunicję
+    magazynek.dostepna_amunicja -= 1
+    session.add(magazynek)
 
     nowa_transakcja = Transakcja(
         uzytkownik_id=uzytkownik.id,  # KLUCZOWE: Powiązanie z zalogowanym userem
@@ -319,7 +351,7 @@ async def rozlicz_pozycja(
         # Sprawdzamy, czy osiągnęliśmy limit 3 strat
         if uzytkownik.licznik_prob >= 3:
             uzytkownik.status_snajpera = 'BLOKADA'
-            uzytkownik.blokada_do = datetime.utcnow() + timedelta(hours=24)
+            uzytkownik.blokada_do = datetime.utcnow() + timedelta(seconds=10)
     else:
         # Zysk lub wyjście na zero - resetujemy licznik
         uzytkownik.licznik_prob = 0
