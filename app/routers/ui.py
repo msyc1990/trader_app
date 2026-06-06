@@ -84,7 +84,7 @@ async def proces_rejestracji(
     nowy_magazynek = Magazynek(
         uzytkownik_id=nowy_uzytkownik.id,
         dostepna_amunicja=3,
-        data_resetu=datetime.utcnow() + timedelta(days=7)
+        data_resetu=datetime.utcnow() + timedelta(seconds=10)  # Szybszy reset dla testów, normalnie byłoby timedelta(days=7
     )
     session.add(nowy_magazynek)
     session.commit()
@@ -140,14 +140,8 @@ async def wyswietl_hud(
             session.add(uzytkownik)
             session.commit()
             
-    # 2. NOWOŚĆ: Pobranie magazynka i obsługa automatycznego odnowienia amunicji (Lazy Refresh)
+    # 2. NOWOŚĆ: Pobranie magazynka (odświeżenie amunicji nastąpi po wyliczeniu poziomu)
     magazynek = session.exec(select(Magazynek).where(Magazynek.uzytkownik_id == uzytkownik.id)).first()
-    if magazynek:
-        if datetime.utcnow() > magazynek.data_resetu:
-            magazynek.dostepna_amunicja = 3
-            magazynek.data_resetu = datetime.utcnow() + timedelta(days=7)
-            session.add(magazynek)
-            session.commit()
     
     # 3. Filtrowanie aktywnych pozycji użytkownika
     statement_pozycje = select(Transakcja).where(
@@ -169,7 +163,46 @@ async def wyswietl_hud(
     
     win_rate = round((pozycje_zyskowne / liczba_zamknietych) * 100, 1) if liczba_zamknietych > 0 else 0.0
     laczna_liczba_strzalow = len(otwarte_pozycje) + liczba_zamknietych
+
+    # 5. Dynamiczne przyznawanie rang i poziomów
+    if liczba_zamknietych >= 7 and win_rate >= 65.0:
+        uzytkownik.poziom = 3
+        if uzytkownik.status_snajpera != 'BLOKADA':
+            uzytkownik.status_snajpera = 'ELITARNY SNAJPER'
+    elif liczba_zamknietych >= 3 and win_rate >= 50.0:
+        uzytkownik.poziom = 2
+        if uzytkownik.status_snajpera != 'BLOKADA':
+            uzytkownik.status_snajpera = 'STRZELEC WYBOROWY'
+    else:
+        uzytkownik.poziom = 1
+        if uzytkownik.status_snajpera != 'BLOKADA':
+            uzytkownik.status_snajpera = 'REKRUT'
+
+    session.add(uzytkownik)
+    session.commit()
+
+    max_amunicji = 3
+    if uzytkownik.poziom == 2:
+        max_amunicji = 4
+    elif uzytkownik.poziom == 3:
+        max_amunicji = 5
+
+    if magazynek:
+        if datetime.utcnow() > magazynek.data_resetu:
+            magazynek.dostepna_amunicja = max_amunicji
+            magazynek.data_resetu = datetime.utcnow() + timedelta(seconds=10)  # Szybszy reset dla testów
+            session.add(magazynek)
+            session.commit()
         
+    wykres_kapitalu = []
+    kapital_poczatkowy = uzytkownik.kapital - total_pnl
+    wykres_kapitalu.append(round(kapital_poczatkowy, 2))
+    biezacy_kapital = kapital_poczatkowy
+    for p in sorted(zamkniete_pozycje, key=lambda x: x.id or 0):
+        if p.wynik_finansowy is not None:
+            biezacy_kapital += p.wynik_finansowy
+            wykres_kapitalu.append(round(biezacy_kapital, 2))
+
     return templates.TemplateResponse(
         request=request,
         name="hud.html",
@@ -180,7 +213,9 @@ async def wyswietl_hud(
             "historia": zamkniete_pozycje,
             "total_pnl": round(total_pnl, 2),
             "win_rate": win_rate,
-            "laczna_liczba_strzalow": laczna_liczba_strzalow
+            "laczna_liczba_strzalow": laczna_liczba_strzalow,
+            "max_amunicji": max_amunicji,
+            "dane_wykresu": wykres_kapitalu
         }
     )
 

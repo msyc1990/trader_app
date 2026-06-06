@@ -1,11 +1,16 @@
 {% extends "baza.html" %}
 
 {% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <div class="space-y-6">
     <div class="flex justify-between items-center border-b border-stone-800 pb-4">
         <div>
             <h2 class="text-xl font-bold text-purple-400 font-mono tracking-wider">SNIPER HUD</h2>
-            <p class="text-xs text-stone-500 font-mono">OPERATOR: <span class="text-stone-300 font-bold">{{ uzytkownik.username }}</span></p>
+            <p class="text-xs text-stone-500 font-mono">
+                OPERATOR: <span class="text-stone-300 font-bold">{{ uzytkownik.username }}</span> 
+                <span class="text-purple-500 text-[10px] ml-2 border border-purple-900 px-1 rounded bg-purple-950/30">LVL {{ uzytkownik.poziom }}</span>
+            </p>
         </div>
         <div class="text-right">
             <span class="text-xs font-mono uppercase tracking-wider text-stone-500 block">Status</span>
@@ -36,6 +41,15 @@
         </div>
     </div>
 
+    <div class="bg-stone-950 border border-stone-800 p-3 rounded-xl">
+        <span class="text-[10px] font-mono text-stone-500 block uppercase tracking-wider mb-2">Krzywa wzrostu kapitału (Equity Curve)</span>
+        <div id="dane-wykresu-holder" data-kapital="{{ dane_wykresu | tojson }}" class="hidden"></div>
+        
+        <div class="h-32 w-full">
+            <canvas id="wykresKapitalu"></canvas>
+        </div>
+    </div>
+
     <div class="grid grid-cols-2 gap-4">
         <div class="bg-stone-950/50 border border-stone-800 p-3 rounded-xl font-mono">
             <span class="text-xs text-stone-500 block">KAPITAŁ VOLATILE</span>
@@ -46,7 +60,7 @@
             <span class="text-base font-bold text-amber-500 tracking-widest block mt-0.5">
                 {% if magazynek and magazynek.dostepna_amunicja > 0 %}
                     {% for n in range(magazynek.dostepna_amunicja) %}⚡{% endfor %} 
-                    <span class="text-xs text-stone-500 font-normal tracking-normal ml-1">({{ magazynek.dostepna_amunicja }}/3)</span>
+                    <span class="text-xs text-stone-500 font-normal tracking-normal ml-1">({{ magazynek.dostepna_amunicja }}/{{ max_amunicji }})</span>
                 {% else %}
                     <span class="text-rose-500 font-bold animate-pulse text-xs uppercase tracking-normal">PUSTY 🚫</span>
                 {% endif %}
@@ -101,7 +115,6 @@
                             <span>Size: <b class="text-purple-400">{{ pozycja.kwota_pozycji }} USDC</b></span>
                         </div>
                     </div>
-                    
                     <div class="text-right flex items-center gap-3">
                         <div class="hidden sm:block text-[11px]">
                             <span class="text-stone-600 block text-[10px]">STOP LOSS</span>
@@ -165,4 +178,50 @@
         </a>
     </div>
 </div>
+
+<script>
+    const ctx = document.getElementById('wykresKapitalu').getContext('2d');
+    
+    // BEZPIECZNE POBRANIE DANYCH - VS Code będzie zachwycony!
+    const daneHolder = document.getElementById('dane-wykresu-holder');
+    const daneKapitalu = JSON.parse(daneHolder.getAttribute('data-kapital'));
+    
+    // Reszta kodu skryptu pozostaje dokładnie taka sama:
+    const etykiety = daneKapitalu.map((_, index) => index === 0 ? 'Start' : `${index}`);
+    const kolorLinii = daneKapitalu[daneKapitalu.length - 1] >= daneKapitalu[0] ? '#10b981' : '#f43f5e';
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: etykiety,
+            datasets: [{
+                label: 'Stan portfela (USDC)',
+                data: daneKapitalu,
+                borderColor: kolorLinii,
+                borderWidth: 2,
+                pointBackgroundColor: kolorLinii,
+                pointRadius: 2,
+                tension: 0.2, // Nadaje linii lekkie, eleganckie zaokrąglenie
+                fill: false
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false } // Ukrywamy legendę dla zachowania mrocznego minimalizmu
+            },
+            scales: {
+                x: {
+                    grid: { color: '#1c1917' }, // Kolor kamiennego tła pasujący do stylistyki
+                    ticks: { color: '#78716c', font: { family: 'monospace', size: 9 } }
+                },
+                y: {
+                    grid: { color: '#1c1917' },
+                    ticks: { color: '#78716c', font: { family: 'monospace', size: 9 } }
+                }
+            }
+        }
+    });
+</script>
 {% endblock %}
