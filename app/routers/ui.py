@@ -1,18 +1,30 @@
 import httpx
-from typing import Generator, Optional
+import json
+from typing import Optional
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from itsdangerous import Signer, BadSignature
 from passlib.context import CryptContext
 from sqlmodel import Session, select
 
 from app.database import get_session
-from app.models import Uzytkownik, Transakcja, Magazynek
+from app.models import Uzytkownik, Transakcja, Magazynek, LogZdarzen
 
 SECRET_KEY = "twoj-bardzo-tajny-klucz-snajpera"
 signer = Signer(SECRET_KEY)
+
+async def utworz_log_i_toast(session: Session, user_id: int, komunikat: str, typ: str = "INFO") -> str:
+    # 1. Zapis zdarzenia do bazy danych dla historii audytowej
+    nowy_log = LogZdarzen(uzytkownik_id=user_id, komunikat=komunikat, typ_zdarzenia=typ)
+    session.add(nowy_log)
+    session.commit()
+    
+    # 2. Przygotowanie struktury JSON dla nagłówka HX-Trigger
+    # Przekazujemy treść oraz typ (np. SUCCESS, WARNING), by frontend wiedział jak zabarwić Toast
+    payload = {"pokazToast": {"text": komunikat, "type": typ}}
+    return json.dumps(payload)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -131,6 +143,8 @@ async def wyswietl_hud(
 ) -> HTMLResponse:
     """Pobiera zalogowanego użytkownika, obsługuje odnowienie amunicji, pobiera pozycje i historię."""
     
+    headers = None
+
     # 1. Sprawdzenie aktywnej blokady Karcera
     if uzytkownik.blokada_do:
         if datetime.utcnow() > uzytkownik.blokada_do:
@@ -139,6 +153,16 @@ async def wyswietl_hud(
             uzytkownik.licznik_prob = 0
             session.add(uzytkownik)
             session.commit()
+
+    if uzytkownik.status_snajpera == 'BLOKADA':
+        headers = {
+            "HX-Trigger": json.dumps({
+                "pokazToast": {
+                    "text": "🚨 PROTOKÓŁ OCHRONY AKTYWNY: Terminal zablokowany!",
+                    "type": "DANGER"
+                }
+            })
+        }
             
     # 2. NOWOŚĆ: Pobranie magazynka (odświeżenie amunicji nastąpi po wyliczeniu poziomu)
     magazynek = session.exec(select(Magazynek).where(Magazynek.uzytkownik_id == uzytkownik.id)).first()
@@ -216,7 +240,8 @@ async def wyswietl_hud(
             "laczna_liczba_strzalow": laczna_liczba_strzalow,
             "max_amunicji": max_amunicji,
             "dane_wykresu": wykres_kapitalu
-        }
+        },
+        headers=headers
     )
 
 
@@ -366,7 +391,20 @@ async def proces_strzalu(
     session.add(nowa_transakcja)
     session.commit()
 
-    return HTMLResponse(content="", headers={"HX-Redirect": "/auth/hud"})
+    trigger_toast = await utworz_log_i_toast(
+        session,
+        uzytkownik.id,
+        f"⚡ Strzał oddany pomyślnie na aktywie {aktywo}!",
+        "SUCCESS"
+    )
+
+    return HTMLResponse(
+        content="",
+        headers={
+            "HX-Location": "/auth/hud",
+            "HX-Trigger": trigger_toast
+        }
+    )
 
 
 # --- OBSŁUGA ROZLICZEŃ Z ZABEZPIECZENIEM ---
@@ -427,4 +465,33 @@ async def rozlicz_pozycja(
     session.add(uzytkownik)
     session.commit()
 
-    return HTMLResponse(content="", headers={"HX-Redirect": "/auth/hud"})
+    if transakcja.wynik_finansowy < 0:
+        if uzytkownik.licznik_prob >= 3 and uzytkownik.status_snajpera == 'BLOKADA':
+            trigger_toast = await utworz_log_i_toast(
+                session,
+                uzytkownik.id,
+                "🚨 STRAŻNIK RYGORU: Terminal zablokowany po 3 stratach!",
+                "DANGER"
+            )
+        else:
+            trigger_toast = await utworz_log_i_toast(
+                session,
+                uzytkownik.id,
+                f"📉 Pozycja zamknięta ze stratą: {transakcja.wynik_finansowy} USDC",
+                "DANGER"
+            )
+    else:
+        trigger_toast = await utworz_log_i_toast(
+            session,
+            uzytkownik.id,
+            f"💰 Cel trafiony! Zysk Netto: +{transakcja.wynik_finansowy} USDC",
+            "SUCCESS"
+        )
+
+    return HTMLResponse(
+        content="",
+        headers={
+            "HX-Location": "/auth/hud",
+            "HX-Trigger": trigger_toast
+        }
+    )

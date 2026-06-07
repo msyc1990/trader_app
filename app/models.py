@@ -12,6 +12,13 @@ class Uzytkownik(SQLModel, table=True):
     blokada_do: Optional[datetime] = Field(default=None)
     licznik_prob: int = Field(default=0)
 
+class LogZdarzen(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    uzytkownik_id: int = Field(foreign_key="uzytkownik.id")
+    komunikat: str
+    typ_zdarzenia: str = Field(default="INFO")  # INFO, SUCCESS, WARNING, DANGER
+    data_logu: datetime = Field(default_factory=datetime.utcnow)
+
 class Magazynek(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     uzytkownik_id: int = Field(foreign_key="uzytkownik.id")
