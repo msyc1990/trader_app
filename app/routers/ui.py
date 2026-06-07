@@ -398,10 +398,16 @@ async def proces_strzalu(
         "SUCCESS"
     )
 
+    hx_location_config = {
+        "path": "/auth/hud",
+        "target": "#app-container",
+        "swap": "innerHTML"
+    }
+
     return HTMLResponse(
         content="",
         headers={
-            "HX-Location": "/auth/hud",
+            "HX-Location": json.dumps(hx_location_config),
             "HX-Trigger": trigger_toast
         }
     )
@@ -488,10 +494,16 @@ async def rozlicz_pozycja(
             "SUCCESS"
         )
 
+    hx_location_config = {
+        "path": "/auth/hud",
+        "target": "#app-container",
+        "swap": "innerHTML"
+    }
+
     return HTMLResponse(
         content="",
         headers={
-            "HX-Location": "/auth/hud",
+            "HX-Location": json.dumps(hx_location_config),
             "HX-Trigger": trigger_toast
         }
     )

@@ -6,6 +6,7 @@
     <title>Ciemna Komnata - Sniper HUD</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="bg-stone-950 text-stone-100 min-h-screen flex flex-col justify-between font-sans selection:bg-purple-500 selection:text-white">
 
@@ -22,5 +23,107 @@
         Ciemna Komnata © 2026 | System Wspomagania Rygoru
     </footer>
 
+    <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none max-w-sm w-full font-mono"></div>
+
+    <script>
+
+    // Nasłuchujemy na globalne zdarzenie rzucane przez HTMX z nagłówka HX-Trigger
+    document.body.addEventListener('pokazToast', function(evt) {
+        const tekst = evt.detail.text;
+        const typ = evt.detail.type; // INFO, SUCCESS, WARNING, DANGER
+
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+
+        // Tworzymy element powiadomienia
+        const toast = document.createElement('div');
+        toast.className = 'pointer-events-auto p-3 rounded-lg border text-xs font-bold transition-all duration-500 transform translate-x-full opacity-0 flex items-center gap-2 shadow-lg';
+
+        // Definiujemy style i ikony w zależności od poziomu rygoru/typu zdarzenia
+        if (typ === 'SUCCESS') {
+            toast.className += ' bg-stone-950 border-emerald-900 text-emerald-400 shadow-emerald-950/20';
+            toast.innerHTML = `🟢 ${tekst}`;
+        } else if (typ === 'DANGER') {
+            toast.className += ' bg-stone-950 border-rose-900 text-rose-500 shadow-rose-950/20';
+            toast.innerHTML = `🚨 ${tekst}`;
+        } else if (typ === 'WARNING') {
+            toast.className += ' bg-stone-950 border-amber-900 text-amber-500 shadow-amber-950/20';
+            toast.innerHTML = `⚠️ ${tekst}`;
+        } else {
+            toast.className += ' bg-stone-950 border-stone-800 text-stone-300 shadow-black/40';
+            toast.innerHTML = `ℹ️ ${tekst}`;
+        }
+
+        // Wstrzykujemy do kontenera
+        container.appendChild(toast);
+
+        // Animacja płynnego wjazdu z prawej strony
+        setTimeout(() => {
+            toast.classList.remove('translate-x-full', 'opacity-0');
+        }, 50);
+
+        // ZMODYFIKOWANY CZAS: Płynne usuwanie powiadomienia po 8 sekundach (8000ms)
+        setTimeout(() => {
+            // Uruchamiamy animację zjazdu/zanikania (trwa 500ms zgodnie z klasą duration-500)
+            toast.classList.add('translate-x-full', 'opacity-0');
+            
+            // Czekamy na zakończenie animacji (550ms) i fizycznie niszczymy element w DOM
+            setTimeout(() => {
+                toast.remove();
+            }, 550);
+        }, 8000);
+    });
+
+    // Funkcja odpowiedzialna za renderowanie wykresu
+    function inicjalizujWykres() {
+        const canvas = document.getElementById('wykresKapitalu');
+        const daneHolder = document.getElementById('dane-wykresu-holder');
+        
+        // Jeśli na obecnym ekranie nie ma wykresu (np. ekran logowania), przerywamy
+        if (!canvas || !daneHolder) return;
+
+        const ctx = canvas.getContext('2d');
+        const daneKapitalu = JSON.parse(daneHolder.getAttribute('data-kapital'));
+        const etykiety = daneKapitalu.map((_, index) => index === 0 ? 'Start' : `${index}`);
+        const kolorLinii = daneKapitalu[daneKapitalu.length - 1] >= daneKapitalu[0] ? '#10b981' : '#f43f5e';
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: etykiety,
+                datasets: [{
+                    label: 'Stan portfela (USDC)',
+                    data: daneKapitalu,
+                    borderColor: kolorLinii,
+                    borderWidth: 2,
+                    pointBackgroundColor: kolorLinii,
+                    pointRadius: 2,
+                    tension: 0.2,
+                    fill: false
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { color: '#1c1917' }, ticks: { color: '#78716c', font: { family: 'monospace', size: 9 } } },
+                    y: { grid: { color: '#1c1917' }, ticks: { color: '#78716c', font: { family: 'monospace', size: 9 } } }
+                }
+            }
+        });
+    }
+
+    // 1. Uruchom wykres przy pierwszym, tradycyjnym wejściu na stronę
+    document.addEventListener('DOMContentLoaded', inicjalizujWykres);
+
+    // 2. KLUCZOWE: Uruchom wykres ponownie po każdej asynchronicznej podmianie kodu przez HTMX
+    document.body.addEventListener('htmx:afterSwap', function(evt) {
+        if (evt.detail.target.id === 'app-container') {
+            inicjalizujWykres();
+        }
+    });
+
+</script>
 </body>
 </html>

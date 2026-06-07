@@ -1,7 +1,6 @@
 {% extends "baza.html" %}
 
 {% block content %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <div class="space-y-6">
     <div class="flex justify-between items-center border-b border-stone-800 pb-4">
@@ -179,49 +178,4 @@
     </div>
 </div>
 
-<script>
-    const ctx = document.getElementById('wykresKapitalu').getContext('2d');
-    
-    // BEZPIECZNE POBRANIE DANYCH - VS Code będzie zachwycony!
-    const daneHolder = document.getElementById('dane-wykresu-holder');
-    const daneKapitalu = JSON.parse(daneHolder.getAttribute('data-kapital'));
-    
-    // Reszta kodu skryptu pozostaje dokładnie taka sama:
-    const etykiety = daneKapitalu.map((_, index) => index === 0 ? 'Start' : `${index}`);
-    const kolorLinii = daneKapitalu[daneKapitalu.length - 1] >= daneKapitalu[0] ? '#10b981' : '#f43f5e';
-
-    new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: etykiety,
-            datasets: [{
-                label: 'Stan portfela (USDC)',
-                data: daneKapitalu,
-                borderColor: kolorLinii,
-                borderWidth: 2,
-                pointBackgroundColor: kolorLinii,
-                pointRadius: 2,
-                tension: 0.2, // Nadaje linii lekkie, eleganckie zaokrąglenie
-                fill: false
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false } // Ukrywamy legendę dla zachowania mrocznego minimalizmu
-            },
-            scales: {
-                x: {
-                    grid: { color: '#1c1917' }, // Kolor kamiennego tła pasujący do stylistyki
-                    ticks: { color: '#78716c', font: { family: 'monospace', size: 9 } }
-                },
-                y: {
-                    grid: { color: '#1c1917' },
-                    ticks: { color: '#78716c', font: { family: 'monospace', size: 9 } }
-                }
-            }
-        }
-    });
-</script>
 {% endblock %}
