@@ -269,9 +269,31 @@ async def proces_krok2(
     request: Request,
     aktywo: str = Form(...),
     interwal: str = Form(...),
-    kierunek: str = Form(...)
+    kierunek: str = Form(...),
+    procent_ryzyka: float = Form(...),
+    uzytkownik: Uzytkownik = Depends(get_current_user)
 ) -> HTMLResponse:
     cena_rynkowa = await pobierz_cene_na_zywo(aktywo)
+    cena_wejscia = round(cena_rynkowa, 4)
+    stop_loss = cena_wejscia * 0.98 if kierunek.upper() == "LONG" else cena_wejscia * 1.02
+
+    kwota_ryzyka_usdc = uzytkownik.kapital * (procent_ryzyka / 100)
+    dystans_sl = abs(cena_wejscia - stop_loss) / cena_wejscia
+
+    if dystans_sl <= 0:
+        return HTMLResponse(
+            content="Błąd: Nie można wyliczyć odległości do Stop Loss. Sprawdź parametry.",
+            headers={"HX-Retarget": "#error-message"}
+        )
+
+    kwota_pozycji = kwota_ryzyka_usdc / dystans_sl
+
+    if kwota_pozycji > uzytkownik.kapital:
+        return HTMLResponse(
+            content=f"Błąd: Wyliczona wielkość pozycji ({kwota_pozycji:.2f} USDC) przekracza Twój dostępny kapitał! Zmniejsz procent ryzyka.",
+            headers={"HX-Retarget": "#error-message"}
+        )
+
     return templates.TemplateResponse(
         request=request,
         name="krok2.html",
@@ -279,7 +301,11 @@ async def proces_krok2(
             "aktywo": aktywo,
             "interwal": interwal,
             "kierunek": kierunek,
-            "cena_wejscia": round(cena_rynkowa, 4)
+            "cena_wejscia": cena_wejscia,
+            "procent_ryzyka": procent_ryzyka,
+            "stop_loss": round(stop_loss, 4),
+            "kwota_pozycji": round(kwota_pozycji, 2),
+            "kwota_ryzyka_usdc": round(kwota_ryzyka_usdc, 2)
         }
     )
 
@@ -292,16 +318,16 @@ async def proces_krok3(
     kierunek: str = Form(...),
     cena_wejscia: float = Form(...),
     kwota_pozycji: float = Form(...),
-    aktualne_rsi: float = Form(...)
+    aktualne_rsi: float = Form(...),
+    stop_loss: float = Form(...)
 ) -> HTMLResponse:
-    stop_loss = cena_wejscia * 0.98 if kierunek.upper() == "LONG" else cena_wejscia * 1.02
     return templates.TemplateResponse(
         request=request,
         name="krok3.html",
         context={
             "aktywo": aktywo, "interwal": interwal, "kierunek": kierunek,
             "cena_wejscia": cena_wejscia, "kwota_pozycji": kwota_pozycji,
-            "aktualne_rsi": aktualne_rsi, "stop_loss": round(stop_loss, 4)
+            "aktualne_rsi": aktualne_rsi, "stop_loss": stop_loss
         }
     )
 

@@ -12,14 +12,27 @@
         <div>
             <label class="text-[11px] text-stone-500 block uppercase mb-1">Cena Wejścia (Live z Binance)</label>
             <input type="number" name="cena_wejscia" step="0.0001" required 
-           value="{{ cena_wejscia }}" 
-           class="w-full bg-stone-900 border border-stone-800 rounded-lg p-2 text-stone-100 focus:outline-none focus:border-purple-500 text-xs font-mono">
+                   value="{{ cena_wejscia }}" readonly
+                   class="w-full bg-stone-900 border border-stone-800 rounded-lg p-2 text-stone-100 focus:outline-none focus:border-purple-500 text-xs font-mono">
         </div>
 
         <div class="grid grid-cols-2 gap-3">
             <div>
                 <label class="block text-xs font-mono uppercase text-stone-400 mb-1">Kwota Pozycji (USDC)</label>
-                <input type="number" name="kwota_pozycji" step="0.01" required placeholder="np. 50"
+                <input type="number" name="kwota_pozycji" step="0.01" value="{{ kwota_pozycji }}" readonly
+                       class="w-full bg-stone-950 border border-stone-800 rounded-lg px-3 py-2 text-stone-100 font-mono focus:outline-none focus:border-purple-500">
+            </div>
+            <div>
+                <label class="block text-xs font-mono uppercase text-stone-400 mb-1">Kwota Ryzyka (USDC)</label>
+                <input type="number" name="kwota_ryzyka_usdc" step="0.01" value="{{ kwota_ryzyka_usdc }}" readonly
+                       class="w-full bg-stone-950 border border-stone-800 rounded-lg px-3 py-2 text-stone-100 font-mono focus:outline-none focus:border-purple-500">
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+            <div>
+                <label class="block text-xs font-mono uppercase text-stone-400 mb-1">Stop Loss</label>
+                <input type="number" name="stop_loss" step="0.0001" value="{{ stop_loss }}" readonly
                        class="w-full bg-stone-950 border border-stone-800 rounded-lg px-3 py-2 text-stone-100 font-mono focus:outline-none focus:border-purple-500">
             </div>
             <div>
