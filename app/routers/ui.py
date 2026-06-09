@@ -318,6 +318,8 @@ async def proces_krok3(
     kierunek: str = Form(...),
     cena_wejscia: float = Form(...),
     kwota_pozycji: float = Form(...),
+    kwota_ryzyka_usdc: float = Form(...),
+    procent_ryzyka: float = Form(...),
     aktualne_rsi: float = Form(...),
     stop_loss: float = Form(...)
 ) -> HTMLResponse:
@@ -327,6 +329,7 @@ async def proces_krok3(
         context={
             "aktywo": aktywo, "interwal": interwal, "kierunek": kierunek,
             "cena_wejscia": cena_wejscia, "kwota_pozycji": kwota_pozycji,
+            "kwota_ryzyka_usdc": kwota_ryzyka_usdc, "procent_ryzyka": procent_ryzyka,
             "aktualne_rsi": aktualne_rsi, "stop_loss": stop_loss
         }
     )
@@ -340,6 +343,8 @@ async def proces_krok4(
     kierunek: str = Form(...),
     cena_wejscia: float = Form(...),
     kwota_pozycji: float = Form(...),
+    kwota_ryzyka_usdc: float = Form(...),
+    procent_ryzyka: float = Form(...),
     aktualne_rsi: float = Form(...),
     stop_loss: float = Form(...),
     poziom_halasu: str = Form(...),
@@ -352,6 +357,7 @@ async def proces_krok4(
         context={
             "aktywo": aktywo, "interwal": interwal, "kierunek": kierunek,
             "cena_wejscia": cena_wejscia, "kwota_pozycji": kwota_pozycji,
+            "kwota_ryzyka_usdc": kwota_ryzyka_usdc, "procent_ryzyka": procent_ryzyka,
             "aktualne_rsi": aktualne_rsi, "stop_loss": stop_loss,
             "poziom_halasu": poziom_halasu, "ranga_strzalu": ranga_strzalu,
             "komentarz": komentarz
@@ -368,6 +374,8 @@ async def proces_strzalu(
     kierunek: str = Form(...),
     cena_wejscia: float = Form(...),
     kwota_pozycji: float = Form(...),
+    kwota_ryzyka_usdc: Optional[float] = Form(None),
+    procent_ryzyka: Optional[float] = Form(None),
     aktualne_rsi: float = Form(...),
     stop_loss: float = Form(...),
     poziom_halasu: str = Form(...),

@@ -16,8 +16,31 @@
         <input type="hidden" name="kierunek" value="{{ kierunek }}">
         <input type="hidden" name="cena_wejscia" value="{{ cena_wejscia }}">
         <input type="hidden" name="kwota_pozycji" value="{{ kwota_pozycji }}">
+        <input type="hidden" name="kwota_ryzyka_usdc" value="{{ kwota_ryzyka_usdc }}">
+        <input type="hidden" name="procent_ryzyka" value="{{ procent_ryzyka }}">
         <input type="hidden" name="aktualne_rsi" value="{{ aktualne_rsi }}">
         <input type="hidden" name="stop_loss" value="{{ stop_loss }}">
+
+        <div class="bg-stone-950 border border-slate-700 p-4 rounded-3xl text-stone-200 space-y-4">
+            <div class="flex items-center justify-between text-[10px] uppercase tracking-widest text-slate-400 font-bold">
+                <span>TAKTYCZNY RAPORT</span>
+                <span class="text-stone-500">Kalkulator Ryzyka</span>
+            </div>
+            <div class="grid grid-cols-2 gap-3 text-xs">
+                <div class="bg-stone-900 border border-emerald-700/25 p-3 rounded-xl">
+                    <span class="block text-stone-400 uppercase">Kwota Pozycji</span>
+                    <span class="block text-lg font-bold text-emerald-300">{{ kwota_pozycji }} USDC</span>
+                </div>
+                <div class="bg-stone-900 border border-rose-700/25 p-3 rounded-xl">
+                    <span class="block text-stone-400 uppercase">Stop Loss</span>
+                    <span class="block text-lg font-bold text-rose-300">{{ stop_loss }}</span>
+                </div>
+                <div class="bg-stone-900 border border-amber-600/25 p-3 rounded-xl col-span-2">
+                    <span class="block text-stone-400 uppercase">Maksymalna strata</span>
+                    <span class="block text-lg font-bold text-amber-300">{{ kwota_ryzyka_usdc }} USDC</span>
+                </div>
+            </div>
+        </div>
 
         <div>
             <label class="block text-xs font-mono uppercase text-stone-400 mb-1">Poziom Hałasu Rynku</label>
