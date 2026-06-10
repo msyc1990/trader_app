@@ -340,7 +340,7 @@ async def proces_krok2(
     uzytkownik: Uzytkownik = Depends(get_current_user)
 ) -> HTMLResponse:
     cena_wejscia, rsi, ema20 = await pobierz_wskazniki_rynkowe(aktywo, interwal)
-    stop_loss = cena_wejscia * 0.98 if kierunek.upper() == "LONG" else cena_wejscia * 1.02
+    stop_loss = cena_wejscia * 0.95 if kierunek.upper() == "LONG" else cena_wejscia * 1.05
 
     ostrzezenie_trendu = False
     komunikat_trendu = ""
@@ -365,6 +365,7 @@ async def proces_krok2(
         )
 
     kwota_pozycji = kwota_ryzyka_usdc / dystans_sl
+    kwota_pozycji = round(kwota_pozycji, 2)
 
     if kwota_pozycji > uzytkownik.kapital:
         return HTMLResponse(
@@ -382,7 +383,7 @@ async def proces_krok2(
             "cena_wejscia": cena_wejscia,
             "procent_ryzyka": procent_ryzyka,
             "stop_loss": round(stop_loss, 4),
-            "kwota_pozycji": round(kwota_pozycji, 2),
+            "kwota_pozycji": kwota_pozycji,
             "kwota_ryzyka_usdc": round(kwota_ryzyka_usdc, 2),
             "rsi": rsi,
             "ema20": ema20,
@@ -472,6 +473,13 @@ async def proces_strzalu(
     session: Session = Depends(get_session),
     uzytkownik: Uzytkownik = Depends(get_current_user)  # ZEZWOLENIE Z SESJI
 ) -> HTMLResponse:
+    print(f"[AUDYT] przychodząca kwota_pozycji: {kwota_pozycji}")
+    if kwota_pozycji <= 0:
+        return HTMLResponse(
+            content="Błąd: Nieprawidłowa kwota pozycji!",
+            headers={"HX-Retarget": "#error-message"}
+        )
+
     if uzytkownik.kapital < kwota_pozycji:
         return HTMLResponse(
             content="Błąd: Brak funduszy na tę pozycję!",
