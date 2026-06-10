@@ -247,6 +247,72 @@ async def wyswietl_hud(
 
 # --- DYNAMICZNE FORMULARZE RYGORU (BEZMIAN) ---
 
+def _oblicz_ema(ceny: list[float], okres: int) -> float:
+    """Oblicza wygładzoną średnią EMA dla podanego okresu."""
+    wspolczynnik = 2 / (okres + 1)
+    ema = sum(ceny[:okres]) / okres
+    for cena in ceny[okres:]:
+        ema = (cena - ema) * wspolczynnik + ema
+    return ema
+
+
+def _oblicz_rsi(ceny: list[float], okres: int) -> float:
+    """Oblicza RSI 14 wykorzystując wygładzanie Wildera."""
+    if len(ceny) <= okres:
+        return 50.0
+
+    zmiany = [ceny[i] - ceny[i - 1] for i in range(1, len(ceny))]
+    zyski = [max(z, 0) for z in zmiany[:okres]]
+    straty = [max(-z, 0) for z in zmiany[:okres]]
+
+    sredni_zysk = sum(zyski) / okres
+    srednia_strata = sum(straty) / okres
+
+    for delta in zmiany[okres:]:
+        zysk = max(delta, 0)
+        strata = max(-delta, 0)
+        sredni_zysk = (sredni_zysk * (okres - 1) + zysk) / okres
+        srednia_strata = (srednia_strata * (okres - 1) + strata) / okres
+
+    if srednia_strata == 0:
+        return 100.0
+
+    rs = sredni_zysk / srednia_strata
+    return 100.0 - (100.0 / (1.0 + rs))
+
+
+async def _pobierz_wskazniki_awaryjne(aktywo: str) -> tuple[float, float, float]:
+    ceny_awaryjne = {"BTC": 65000.0, "ETH": 35000.0, "BNB": 580.0}
+    cena = ceny_awaryjne.get(aktywo.upper(), 1.0)
+    return round(cena, 4), 50.0, round(cena, 4)
+
+
+async def pobierz_wskazniki_rynkowe(aktywo: str, interwal: str) -> tuple[float, float, float]:
+    """Pobiera z Binance aktualną cenę, EMA20 oraz RSI14 dla danego aktywa i interwału."""
+    symbol = f"{aktywo.upper()}USDT"
+    url = "https://api.binance.com/api/v3/klines"
+    params = {"symbol": symbol, "interval": interwal, "limit": 50}
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, params=params, timeout=5.0)
+            response.raise_for_status()
+            dane = response.json()
+            if not isinstance(dane, list) or len(dane) < 20:
+                raise ValueError("Nieprawidłowa odpowiedź Binance")
+
+            zamkniecia = [float(k[4]) for k in dane if len(k) > 4]
+            if len(zamkniecia) < 20:
+                raise ValueError("Za mało danych do obliczeń")
+
+            aktualna_cena = zamkniecia[-1]
+            ema20 = _oblicz_ema(zamkniecia, 20)
+            rsi = _oblicz_rsi(zamkniecia, 14)
+            return round(aktualna_cena, 4), round(rsi, 2), round(ema20, 4)
+    except Exception:
+        return await _pobierz_wskazniki_awaryjne(aktywo)
+
+
 async def pobierz_cene_na_zywo(aktywo: str) -> float:
     """Pobiera aktualną cenę z Binance API. W razie błędu zwraca cenę awaryjną."""
     symbol = f"{aktywo.upper()}USDC"
@@ -273,9 +339,21 @@ async def proces_krok2(
     procent_ryzyka: float = Form(...),
     uzytkownik: Uzytkownik = Depends(get_current_user)
 ) -> HTMLResponse:
-    cena_rynkowa = await pobierz_cene_na_zywo(aktywo)
-    cena_wejscia = round(cena_rynkowa, 4)
+    cena_wejscia, rsi, ema20 = await pobierz_wskazniki_rynkowe(aktywo, interwal)
     stop_loss = cena_wejscia * 0.98 if kierunek.upper() == "LONG" else cena_wejscia * 1.02
+
+    ostrzezenie_trendu = False
+    komunikat_trendu = ""
+    if kierunek.upper() == "LONG" and cena_wejscia < ema20:
+        ostrzezenie_trendu = True
+        komunikat_trendu = "⚠️ GRA POD PRĄD: Rynek w trendzie spadkowym (Cena poniżej EMA20)!"
+    elif kierunek.upper() == "SHORT" and cena_wejscia > ema20:
+        ostrzezenie_trendu = True
+        komunikat_trendu = "⚠️ GRA POD PRĄD: Rynek w trendzie wzrostowym (Cena powyżej EMA20)!"
+
+    if ostrzezenie_trendu:
+        procent_ryzyka = procent_ryzyka / 2
+        komunikat_trendu += " Ryzyko zredukowane o 50% ze względów bezpieczeństwa."
 
     kwota_ryzyka_usdc = uzytkownik.kapital * (procent_ryzyka / 100)
     dystans_sl = abs(cena_wejscia - stop_loss) / cena_wejscia
@@ -305,7 +383,11 @@ async def proces_krok2(
             "procent_ryzyka": procent_ryzyka,
             "stop_loss": round(stop_loss, 4),
             "kwota_pozycji": round(kwota_pozycji, 2),
-            "kwota_ryzyka_usdc": round(kwota_ryzyka_usdc, 2)
+            "kwota_ryzyka_usdc": round(kwota_ryzyka_usdc, 2),
+            "rsi": rsi,
+            "ema20": ema20,
+            "ostrzezenie_trendu": ostrzezenie_trendu,
+            "komunikat_trendu": komunikat_trendu
         }
     )
 

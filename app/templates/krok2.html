@@ -13,6 +13,8 @@
         <input type="hidden" name="kwota_ryzyka_usdc" value="{{ kwota_ryzyka_usdc }}">
         <input type="hidden" name="stop_loss" value="{{ stop_loss }}">
         <input type="hidden" name="procent_ryzyka" value="{{ procent_ryzyka }}">
+        <input type="hidden" name="ema20" value="{{ ema20 }}">
+        <input type="hidden" name="rsi" value="{{ rsi }}">
 
         <div class="bg-stone-950 border border-emerald-600/20 p-4 rounded-2xl text-stone-200 space-y-3">
             <div class="flex items-center justify-between text-[10px] uppercase tracking-widest text-emerald-400 font-bold">
@@ -63,9 +65,30 @@
             </div>
             <div>
                 <label class="block text-xs font-mono uppercase text-stone-400 mb-1">Aktualne RSI (14)</label>
-                <input type="number" name="aktualne_rsi" step="0.1" required placeholder="np. 42.5"
+                <input type="number" name="aktualne_rsi" step="0.1" required readonly value="{{ rsi }}"
                        class="w-full bg-stone-950 border border-stone-800 rounded-lg px-3 py-2 text-stone-100 font-mono focus:outline-none focus:border-purple-500">
             </div>
+        </div>
+        <div class="bg-stone-900 border border-sky-700/20 p-4 rounded-2xl text-stone-200 space-y-3">
+            <div class="flex items-center justify-between text-[10px] uppercase tracking-widest text-sky-400 font-bold">
+                <span>STRAŻNIK TRENDU</span>
+                <span class="text-stone-500">Trend / EMA20</span>
+            </div>
+            <div class="grid grid-cols-2 gap-3 text-xs">
+                <div class="bg-stone-950 border border-sky-700/25 p-3 rounded-xl">
+                    <span class="block text-stone-400 uppercase">EMA20</span>
+                    <span class="block text-lg font-bold text-sky-300">{{ ema20 }}</span>
+                </div>
+                <div class="bg-stone-950 border border-sky-700/25 p-3 rounded-xl">
+                    <span class="block text-stone-400 uppercase">RSI14</span>
+                    <span class="block text-lg font-bold text-sky-300">{{ rsi }}</span>
+                </div>
+            </div>
+            {% if komunikat_trendu %}
+            <div class="bg-rose-950 border border-rose-700/30 rounded-xl p-3 text-rose-200 text-xs">
+                {{ komunikat_trendu }}
+            </div>
+            {% endif %}
         </div>
 
         <div class="flex gap-2">
