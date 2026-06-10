@@ -19,7 +19,16 @@
         <input type="hidden" name="kwota_ryzyka_usdc" value="{{ kwota_ryzyka_usdc }}">
         <input type="hidden" name="procent_ryzyka" value="{{ procent_ryzyka }}">
         <input type="hidden" name="aktualne_rsi" value="{{ aktualne_rsi }}">
+        <input type="hidden" name="ema20" value="{{ ema20 }}">
+        <input type="hidden" name="ostrzezenie_trendu" value="{{ 'true' if ostrzezenie_trendu else 'false' }}">
+        <input type="hidden" name="komunikat_trendu" value="{{ komunikat_trendu }}">
         <input type="hidden" name="stop_loss" value="{{ stop_loss }}">
+
+        {% if ostrzezenie_trendu %}
+        <div class="bg-red-950 border border-red-500 text-red-400 p-3 rounded mb-4 text-xs font-mono animate-pulse">
+            {{ komunikat_trendu }}
+        </div>
+        {% endif %}
 
         <div class="bg-stone-950 border border-slate-700 p-4 rounded-3xl text-stone-200 space-y-4">
             <div class="flex items-center justify-between text-[10px] uppercase tracking-widest text-slate-400 font-bold">
@@ -38,6 +47,14 @@
                 <div class="bg-stone-900 border border-amber-600/25 p-3 rounded-xl col-span-2">
                     <span class="block text-stone-400 uppercase">Maksymalna strata</span>
                     <span class="block text-lg font-bold text-amber-300">{{ kwota_ryzyka_usdc }} USDC</span>
+                </div>
+                <div class="bg-stone-900 border border-slate-700/25 p-3 rounded-xl">
+                    <span class="block text-stone-400 uppercase">RSI(14)</span>
+                    <span class="block text-lg font-bold {% if aktualne_rsi > 70 %}text-red-400{% elif aktualne_rsi < 30 %}text-emerald-400{% else %}text-stone-300{% endif %}">{{ aktualne_rsi }}</span>
+                </div>
+                <div class="bg-stone-900 border border-sky-700/25 p-3 rounded-xl">
+                    <span class="block text-stone-400 uppercase">EMA(20)</span>
+                    <span class="block text-lg font-bold text-sky-300">{{ ema20 }} USDC</span>
                 </div>
             </div>
         </div>

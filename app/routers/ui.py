@@ -403,6 +403,9 @@ async def proces_krok3(
     kwota_ryzyka_usdc: float = Form(...),
     procent_ryzyka: float = Form(...),
     aktualne_rsi: float = Form(...),
+    ema20: float = Form(...),
+    ostrzezenie_trendu: bool = Form(False),
+    komunikat_trendu: str = Form(""),
     stop_loss: float = Form(...)
 ) -> HTMLResponse:
     return templates.TemplateResponse(
@@ -412,7 +415,10 @@ async def proces_krok3(
             "aktywo": aktywo, "interwal": interwal, "kierunek": kierunek,
             "cena_wejscia": cena_wejscia, "kwota_pozycji": kwota_pozycji,
             "kwota_ryzyka_usdc": kwota_ryzyka_usdc, "procent_ryzyka": procent_ryzyka,
-            "aktualne_rsi": aktualne_rsi, "stop_loss": stop_loss
+            "aktualne_rsi": aktualne_rsi, "ema20": ema20,
+            "ostrzezenie_trendu": ostrzezenie_trendu,
+            "komunikat_trendu": komunikat_trendu,
+            "stop_loss": stop_loss
         }
     )
 
