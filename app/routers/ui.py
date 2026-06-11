@@ -323,29 +323,54 @@ async def _pobierz_wskazniki_awaryjne(aktywo: str) -> tuple[float, float, float]
 
 
 async def pobierz_wskazniki_rynkowe(aktywo: str, interwal: str) -> tuple[float, float, float]:
-    """Pobiera z Binance aktualną cenę, EMA20 oraz RSI14 dla danego aktywa i interwału."""
+    # Dynamiczne budowanie pary, np. z "BTC" robimy "BTCUSDT"
     symbol = f"{aktywo.upper()}USDT"
-    url = "https://api.binance.com/api/v3/klines"
-    params = {"symbol": symbol, "interval": interwal, "limit": 50}
-
+    url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interwal}&limit=50"
+    
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.get(url, params=params, timeout=5.0)
+            response = await client.get(url, timeout=10)
             response.raise_for_status()
             dane = response.json()
-            if not isinstance(dane, list) or len(dane) < 20:
-                raise ValueError("Nieprawidłowa odpowiedź Binance")
+    except Exception as e:
+        print(f"[BŁĄD] Nie można pobrać danych z Binance dla {symbol}: {e}")
+        return 0.0, 50.0, 0.0 # Ochronny Fallback
 
-            zamkniecia = [float(k[4]) for k in dane if len(k) > 4]
-            if len(zamkniecia) < 20:
-                raise ValueError("Za mało danych do obliczeń")
+    if not dane or len(dane) < 20:
+        return 0.0, 50.0, 0.0
 
-            aktualna_cena = zamkniecia[-1]
-            ema20 = _oblicz_ema(zamkniecia, 20)
-            rsi = _oblicz_rsi(zamkniecia, 14)
-            return round(aktualna_cena, 4), round(rsi, 2), round(ema20, 4)
-    except Exception:
-        return await _pobierz_wskazniki_awaryjne(aktywo)
+    # Pobranie cen zamknięcia ze świec
+    ceny_zamkniecia = [float(swieca[4]) for swieca in dane]
+    aktualna_cena = ceny_zamkniecia[-1]
+
+    # Obliczanie EMA 20
+    okres_ema = 20
+    k = 2 / (okres_ema + 1)
+    ema = ceny_zamkniecia[0]
+    for cena in ceny_zamkniecia[1:]:
+        ema = (cena * k) + (ema * (1 - k))
+
+    # Obliczanie RSI 14
+    zmiany = [ceny_zamkniecia[i] - ceny_zamkniecia[i-1] for i in range(1, len(ceny_zamkniecia))]
+    zyski = [z if z > 0 else 0 for z in zmiany[:14]]
+    straty = [-z if z < 0 else 0 for z in zmiany[:14]]
+
+    sr_zysk = sum(zyski) / 14
+    sr_strata = sum(straty) / 14
+
+    for zmiana in zmiany[14:]:
+        zysk = zmiana if zmiana > 0 else 0
+        strata = -zmiana if zmiana < 0 else 0
+        sr_zysk = (sr_zysk * 13 + zysk) / 14
+        sr_strata = (sr_strata * 13 + strata) / 14
+
+    if sr_strata == 0:
+        rsi = 100.0
+    else:
+        rs = sr_zysk / sr_strata
+        rsi = 100 - (100 / (1 + rs))
+
+    return aktualna_cena, round(rsi, 2), ema
 
 
 async def pobierz_cene_na_zywo(aktywo: str) -> float:
