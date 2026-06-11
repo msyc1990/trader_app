@@ -49,14 +49,13 @@
                     <span class="block text-lg font-bold text-amber-300">{{ kwota_ryzyka_usdc }} USDC</span>
                 </div>
                 <div class="bg-stone-900 border border-slate-700/25 p-3 rounded-xl">
-                    <span class="block text-stone-400 uppercase">RSI(14)</span>
-                    <span class="block text-lg font-bold {% if aktualne_rsi > 70 %}text-red-400{% elif aktualne_rsi < 30 %}text-emerald-400{% else %}text-stone-300{% endif %}">{{ aktualne_rsi }}</span>
+                    <span class="block text-stone-400 uppercase">RSI(14): {{ aktualne_rsi }}</span>
                 </div>
                 <div class="bg-stone-900 border border-sky-700/25 p-3 rounded-xl">
-                    <span class="block text-stone-400 uppercase">EMA(20)</span>
-                    <span class="block text-lg font-bold text-sky-300">{{ ema20 }} USDC</span>
+                    <span class="block text-stone-400 uppercase">EMA(20): {{ ema20 | round(4) }}</span>
                 </div>
             </div>
+            <div class="text-xs text-stone-400">Cena Wejścia: {{ cena_wejscia }}</div>
         </div>
 
         <div>

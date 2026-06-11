@@ -46,16 +46,15 @@
             </div>
             <div class="grid grid-cols-2 gap-3 text-xs">
                 <div class="bg-stone-900 border border-slate-700/25 p-3 rounded-xl">
-                    <span class="block text-stone-400 uppercase">RSI(14)</span>
-                    <span class="block text-lg font-bold {% if rsi > 70 %}text-red-400{% elif rsi < 30 %}text-emerald-400{% else %}text-stone-300{% endif %}">{{ rsi }}</span>
+                    <span class="block text-stone-400 uppercase">RSI(14): {{ rsi }}</span>
                 </div>
                 <div class="bg-stone-900 border border-sky-700/25 p-3 rounded-xl">
-                    <span class="block text-stone-400 uppercase">EMA(20)</span>
-                    <span class="block text-lg font-bold text-sky-300">{{ ema20 }} USDC</span>
+                    <span class="block text-stone-400 uppercase">EMA(20): {{ ema20 | round(4) }}</span>
                 </div>
             </div>
         </div>
 
+        <div class="text-xs text-stone-400">Cena Wejścia: {{ cena_wejscia }}</div>
         <div>
             <label class="text-[11px] text-stone-500 block uppercase mb-1">Cena Wejścia (Live z Binance)</label>
             <input type="number" name="cena_wejscia" step="0.0001" required 
@@ -95,19 +94,10 @@
             </div>
             <div class="grid grid-cols-2 gap-3 text-xs">
                 <div class="bg-stone-950 border border-sky-700/25 p-3 rounded-xl">
-                    <span class="block text-stone-400 uppercase">EMA20</span>
-                    <span class="block text-lg font-bold text-sky-300">{{ ema20 }}</span>
-                </div>
-                <div class="bg-stone-950 border border-sky-700/25 p-3 rounded-xl">
-                    <span class="block text-stone-400 uppercase">RSI14</span>
-                    <span class="block text-lg font-bold text-sky-300">{{ rsi }}</span>
-                </div>
-            </div>
-            {% if komunikat_trendu %}
-            <div class="bg-rose-950 border border-rose-700/30 rounded-xl p-3 text-rose-200 text-xs">
-                {{ komunikat_trendu }}
-            </div>
-            {% endif %}
+                        <span class="block text-stone-400 uppercase">EMA(20): {{ ema20 | round(4) }}</span>
+                    </div>
+                    <div class="bg-stone-950 border border-sky-700/25 p-3 rounded-xl">
+                        <span class="block text-stone-400 uppercase">RSI(14): {{ rsi }}</span>
         </div>
 
         {% if ostrzezenie_trendu %}
