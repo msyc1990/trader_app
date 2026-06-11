@@ -137,24 +137,24 @@ async def proces_logowania(
 
 @router.post("/hud/szukaj-tokena", response_class=HTMLResponse)
 async def szukaj_tokena(
-    szukaj: str = Form(""),
+    aktywo: str = Form(""),
     session: Session = Depends(get_session)
 ) -> HTMLResponse:
     """Wyszukuje tokeny z bazy TokenRynkowy pasujące do danej frazy."""
-    if len(szukaj.strip()) == 0:
+    if len(aktywo.strip()) == 0:
         return HTMLResponse(content="")
     
-    # Wyszukaj tokeny, których symbol zaczyna się od szukanej frazy
+    # Wyszukaj tokeny, których symbol zaczyna się od wpisanej frazy (np. SOL, BTC)
     statement = select(TokenRynkowy).where(
-        TokenRynkowy.symbol.like(f"{szukaj.upper()}%")
+        TokenRynkowy.symbol.like(f"{aktywo.upper()}%")
     ).limit(8)
     
     tokeny = session.exec(statement).all()
     
     if not tokeny:
-        return HTMLResponse(content='<div class="text-xs text-red-500 p-2">Brak wyników</div>')
+        return HTMLResponse(content='<div class="text-xs text-red-500 p-2 border border-red-800 bg-red-950 mt-1 rounded">Brak tokenu na Binance</div>')
     
-    # Generuj przyciski dla każdego znalezionego tokenu
+    # Generuj taktyczne przyciski dla każdego znalezionego tokenu
     html_wyniki = ""
     for token in tokeny:
         html_wyniki += f'''
