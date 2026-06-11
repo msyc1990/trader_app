@@ -42,3 +42,8 @@ class Transakcja(SQLModel, table=True):
     wynik_finansowy: Optional[float] = Field(default=None)
     status_pozycji: str = Field(default="OTWARTA")  # OTWARTA, ZAMKNIETA
     data_strzalu: datetime = Field(default_factory=datetime.utcnow)
+
+class TokenRynkowy(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    symbol: str = Field(unique=True, index=True)  # np. "BTC", "ETH", "SOL", "PEPE"
+    nazwa_pary: str                                # np. "BTCUSDT", "ETHUSDT"
