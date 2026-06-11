@@ -10,7 +10,7 @@ from passlib.context import CryptContext
 from sqlmodel import Session, select
 
 from app.database import get_session
-from app.models import Uzytkownik, Transakcja, Magazynek, LogZdarzen
+from app.models import Uzytkownik, Transakcja, Magazynek, LogZdarzen, TokenRynkowy
 
 SECRET_KEY = "twoj-bardzo-tajny-klucz-snajpera"
 signer = Signer(SECRET_KEY)
@@ -131,6 +131,41 @@ async def proces_logowania(
     # Zapisujemy ciasteczko bezpiecznie (httponly chroni przed atakami XSS)
     response.set_cookie(key="session_id", value=signed_id, httponly=True, path="/")
     return response
+
+
+# --- ENDPOINT WYSZUKIWANIA TOKENÓW (AUTOCOMPLETE) ---
+
+@router.post("/hud/szukaj-tokena", response_class=HTMLResponse)
+async def szukaj_tokena(
+    szukaj: str = Form(""),
+    session: Session = Depends(get_session)
+) -> HTMLResponse:
+    """Wyszukuje tokeny z bazy TokenRynkowy pasujące do danej frazy."""
+    if len(szukaj.strip()) == 0:
+        return HTMLResponse(content="")
+    
+    # Wyszukaj tokeny, których symbol zaczyna się od szukanej frazy
+    statement = select(TokenRynkowy).where(
+        TokenRynkowy.symbol.like(f"{szukaj.upper()}%")
+    ).limit(8)
+    
+    tokeny = session.exec(statement).all()
+    
+    if not tokeny:
+        return HTMLResponse(content='<div class="text-xs text-red-500 p-2">Brak wyników</div>')
+    
+    # Generuj przyciski dla każdego znalezionego tokenu
+    html_wyniki = ""
+    for token in tokeny:
+        html_wyniki += f'''
+        <button type="button" 
+                hx-on:click="document.getElementById('aktywo-input').value = '{token.symbol}'; document.getElementById('wyniki-szukania').innerHTML = ''; document.getElementById('aktywo-input').focus();"
+                class="block w-full text-left p-2 bg-gray-800 hover:bg-green-500 hover:text-black text-xs font-mono border-b border-gray-700 text-green-400 transition-colors">
+            {token.symbol} ({token.nazwa_pary})
+        </button>
+        '''
+    
+    return HTMLResponse(content=html_wyniki)
 
 
 # --- BEZPIECZNY ENDPOINT HUD (Z LOGIKĄ REFRESHU MAGAZYNKA) ---
