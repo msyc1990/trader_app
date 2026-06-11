@@ -324,8 +324,15 @@ async def _pobierz_wskazniki_awaryjne(aktywo: str) -> tuple[float, float, float]
 
 async def pobierz_wskazniki_rynkowe(aktywo: str, interwal: str) -> tuple[float, float, float]:
     # Dynamiczne budowanie pary, np. z "BTC" robimy "BTCUSDT"
+    mapa_interwalow = {
+        "M1": "1m", "M5": "5m", "M15": "15m", "M30": "30m",
+        "H1": "1h", "H4": "4h", "D1": "1d", "W1": "1w"
+    }
+    # Zamień interwał z frontu na interwał Binance, domyślnie używając 1h jeśli nie znaleziono
+    binance_interval = mapa_interwalow.get(interwal.upper(), "1h")
+
     symbol = f"{aktywo.upper()}USDT"
-    url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interwal}&limit=50"
+    url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={binance_interval}&limit=50"
     
     try:
         async with httpx.AsyncClient() as client:
