@@ -404,15 +404,25 @@ async def proces_krok2(
     interwal: str = Form(...),
     kierunek: str = Form(...),
     procent_ryzyka: float = Form(...),
+    cena_wejscia: Optional[float] = Form(None),
+    dystans_sl_procent: float = Form(2.0),
     uzytkownik: Uzytkownik = Depends(get_current_user)
 ) -> HTMLResponse:
-    cena_wejscia, rsi, ema20 = await pobierz_wskazniki_rynkowe(aktywo, interwal)
+    cena_rynkowa, rsi, ema20 = await pobierz_wskazniki_rynkowe(aktywo, interwal)
+    if not cena_wejscia or cena_wejscia <= 0:
+        cena_wejscia = cena_rynkowa
+
     if cena_wejscia <= 0:
         return HTMLResponse(
-            content=f'<div class="bg-red-950 border border-red-500 text-red-400 p-3 rounded mb-4 text-xs font-mono">BŁĄD: Nie udało się pobrać aktualnej ceny dla {aktywo}. Binance odrzuciło połączenie lub token nie istnieje na rynku Spot.</div>',
+            content='<div class="bg-red-950 border border-red-500 text-red-400 p-3 rounded mb-4 text-xs font-mono">BŁĄD: Nie można określić ceny wejścia.</div>',
             headers={"HX-Retarget": "#error-message"}
         )
-    stop_loss = cena_wejscia * 0.95 if kierunek.upper() == "LONG" else cena_wejscia * 1.05
+
+    stop_loss = (
+        cena_wejscia * (1 - (dystans_sl_procent / 100))
+        if kierunek.upper() == "LONG"
+        else cena_wejscia * (1 + (dystans_sl_procent / 100))
+    )
 
     ostrzezenie_trendu = False
     komunikat_trendu = ""
@@ -428,7 +438,7 @@ async def proces_krok2(
         komunikat_trendu += " Ryzyko zredukowane o 50% ze względów bezpieczeństwa."
 
     kwota_ryzyka_usdc = uzytkownik.kapital * (procent_ryzyka / 100)
-    dystans_sl = abs(cena_wejscia - stop_loss) / cena_wejscia
+    dystans_sl = dystans_sl_procent / 100
 
     if dystans_sl <= 0:
         return HTMLResponse(
@@ -453,6 +463,7 @@ async def proces_krok2(
             "interwal": interwal,
             "kierunek": kierunek,
             "cena_wejscia": cena_wejscia,
+            "dystans_sl_procent": dystans_sl_procent,
             "procent_ryzyka": procent_ryzyka,
             "stop_loss": round(stop_loss, 4),
             "kwota_pozycji": kwota_pozycji,
